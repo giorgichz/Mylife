@@ -103,6 +103,12 @@ export type ChatRole = 'user' | 'assistant';
 export type AiToolAction = {
   kind: 'create_goal' | 'update_goal' | 'delete_goal' | 'create_subgoal' | 'set_priority' | 'generate_plan';
   label: string;
+  /** Parsed data the action applies when tapped, e.g. a goal title guessed from free text. */
+  payload?: {
+    title?: string;
+    areaKey?: AreaKey;
+    deadline?: string;
+  };
 };
 
 export type AiMessage = {

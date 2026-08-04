@@ -27,7 +27,7 @@ export default function ZieleScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Ziele</Text>
-          <AnimatedPressable style={styles.addButton} onPress={() => router.push('/(tabs)/ki')} hitSlop={8}>
+          <AnimatedPressable style={styles.addButton} onPress={() => router.push('/goal/new')} hitSlop={8}>
             <Ionicons name="add" size={22} color={colors.textInverse} />
           </AnimatedPressable>
         </View>

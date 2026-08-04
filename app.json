@@ -7,14 +7,14 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A0A0A",
+    "backgroundColor": "#060608",
     "newArchEnabled": true,
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0A0A0A",
+          "backgroundColor": "#060608",
           "image": "./assets/icon.png",
           "imageWidth": 120
         }
@@ -35,7 +35,7 @@
       "userInterfaceStyle": "dark",
       "package": "com.mylife.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0A0A0A",
+        "backgroundColor": "#060608",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLifeStore } from '../../../src/store/useLifeStore';
-import { ScreenContainer, GlassCard, SectionHeader } from '../../../src/components/ui';
+import { ScreenContainer, GlassCard, SectionHeader, Button } from '../../../src/components/ui';
 import { ProgressBar } from '../../../src/components/ui/ProgressBar';
 import { DomainHeader } from '../../../src/components/domain/DomainHeader';
 import { colors, spacing, type } from '../../../src/theme';
@@ -57,68 +57,80 @@ export default function GeldScreen() {
 
         <View style={styles.section}>
           <SectionHeader title="Konten" />
-          <View style={styles.list}>
-            {accounts.map((acc) => (
-              <GlassCard key={acc.id} style={styles.accountRow}>
-                <View style={styles.accountIconWrap}>
-                  <Ionicons name="business-outline" size={16} color={colors.area.geld} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.accountName}>{acc.name}</Text>
-                  <Text style={styles.accountInstitution}>{acc.institution}</Text>
-                </View>
-                <Text style={styles.accountBalance}>{currency(acc.balance)}</Text>
-              </GlassCard>
-            ))}
-          </View>
+          {accounts.length === 0 ? (
+            <GlassCard style={styles.emptyCard}>
+              <Ionicons name="link-outline" size={20} color={colors.textTertiary} />
+              <Text style={styles.emptyText}>Noch kein Konto verbunden.</Text>
+              <Button label="Konto verbinden" variant="secondary" onPress={() => {}} />
+            </GlassCard>
+          ) : (
+            <View style={styles.list}>
+              {accounts.map((acc) => (
+                <GlassCard key={acc.id} style={styles.accountRow}>
+                  <View style={styles.accountIconWrap}>
+                    <Ionicons name="business-outline" size={16} color={colors.area.geld} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.accountName}>{acc.name}</Text>
+                    <Text style={styles.accountInstitution}>{acc.institution}</Text>
+                  </View>
+                  <Text style={styles.accountBalance}>{currency(acc.balance)}</Text>
+                </GlassCard>
+              ))}
+            </View>
+          )}
         </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Budgets" />
-          <GlassCard style={styles.card}>
-            {budgets.map((b, i) => {
-              const pct = Math.min(100, Math.round((b.spent / b.limit) * 100));
-              const over = b.spent > b.limit;
-              return (
-                <React.Fragment key={b.id}>
+        {budgets.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="Budgets" />
+            <GlassCard style={styles.card}>
+              {budgets.map((b, i) => {
+                const pct = Math.min(100, Math.round((b.spent / b.limit) * 100));
+                const over = b.spent > b.limit;
+                return (
+                  <React.Fragment key={b.id}>
+                    {i > 0 && <View style={styles.divider} />}
+                    <View style={styles.budgetRow}>
+                      <View style={styles.budgetHeader}>
+                        <Text style={styles.budgetCategory}>{b.category}</Text>
+                        <Text style={[styles.budgetAmount, over && { color: colors.danger }]}>
+                          {currency(b.spent)} / {currency(b.limit)}
+                        </Text>
+                      </View>
+                      <ProgressBar value={pct} color={over ? colors.danger : colors.area.geld} />
+                    </View>
+                  </React.Fragment>
+                );
+              })}
+            </GlassCard>
+          </View>
+        )}
+
+        {transactions.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="Letzte Transaktionen" />
+            <GlassCard style={styles.card}>
+              {transactions.slice(0, 5).map((tx, i) => (
+                <React.Fragment key={tx.id}>
                   {i > 0 && <View style={styles.divider} />}
-                  <View style={styles.budgetRow}>
-                    <View style={styles.budgetHeader}>
-                      <Text style={styles.budgetCategory}>{b.category}</Text>
-                      <Text style={[styles.budgetAmount, over && { color: colors.danger }]}>
-                        {currency(b.spent)} / {currency(b.limit)}
+                  <View style={styles.txRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.txMerchant}>{tx.merchant}</Text>
+                      <Text style={styles.txMeta}>
+                        {tx.category} · {formatShortDate(tx.date)}
                       </Text>
                     </View>
-                    <ProgressBar value={pct} color={over ? colors.danger : colors.area.geld} />
-                  </View>
-                </React.Fragment>
-              );
-            })}
-          </GlassCard>
-        </View>
-
-        <View style={styles.section}>
-          <SectionHeader title="Letzte Transaktionen" />
-          <GlassCard style={styles.card}>
-            {transactions.slice(0, 5).map((tx, i) => (
-              <React.Fragment key={tx.id}>
-                {i > 0 && <View style={styles.divider} />}
-                <View style={styles.txRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.txMerchant}>{tx.merchant}</Text>
-                    <Text style={styles.txMeta}>
-                      {tx.category} · {formatShortDate(tx.date)}
+                    <Text style={[styles.txAmount, { color: tx.amount > 0 ? colors.success : colors.textPrimary }]}>
+                      {tx.amount > 0 ? '+' : ''}
+                      {currency(tx.amount)}
                     </Text>
                   </View>
-                  <Text style={[styles.txAmount, { color: tx.amount > 0 ? colors.success : colors.textPrimary }]}>
-                    {tx.amount > 0 ? '+' : ''}
-                    {currency(tx.amount)}
-                  </Text>
-                </View>
-              </React.Fragment>
-            ))}
-          </GlassCard>
-        </View>
+                </React.Fragment>
+              ))}
+            </GlassCard>
+          </View>
+        )}
 
         <View style={[styles.section, { marginBottom: 0 }]}>
           <SectionHeader title="Geld-Score" />
@@ -176,6 +188,15 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  emptyText: {
+    ...type.callout,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   accountRow: {
     flexDirection: 'row',

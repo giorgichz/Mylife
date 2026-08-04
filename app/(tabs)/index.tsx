@@ -64,19 +64,33 @@ export default function HomeScreen() {
                 ))}
               </View>
             </View>
-            <View style={styles.focusDivider} />
-            <View style={styles.focusRow}>
-              <Ionicons name="flash-outline" size={16} color={colors.accent} />
-              <Text style={styles.focusText}>
-                Tagesfokus: Theorie üben & Bewerbung an Stadtwerke fertigstellen.
-              </Text>
-            </View>
           </GlassCard>
         </View>
 
         <View style={styles.section}>
+          <AnimatedPressable
+            onPress={() => (topGoals.length > 0 ? router.push(`/goal/${topGoals[0].id}`) : router.push('/goal/new'))}
+          >
+            <GlassCard style={styles.focusCard}>
+              <View style={styles.focusIconWrap}>
+                <Ionicons name="flash" size={16} color={colors.area.psyche} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.focusLabel}>Tagesfokus</Text>
+                <Text style={styles.focusText}>
+                  {topGoals.length > 0 ? topGoals[0].title : 'Leg dein erstes Ziel an, um loszulegen.'}
+                </Text>
+              </View>
+              <View style={styles.focusArrow}>
+                <Ionicons name="arrow-forward" size={16} color={colors.area.psyche} />
+              </View>
+            </GlassCard>
+          </AnimatedPressable>
+        </View>
+
+        <View style={styles.section}>
           <SectionHeader title="Heute erledigen" actionLabel={`${doneCount}/${todayTasks.length}`} />
-          <GlassCard style={styles.listCard}>
+          <GlassCard style={styles.listCard} flat>
             {todayTasks.length === 0 ? (
               <Text style={styles.emptyText}>Für heute ist nichts offen. Genieß den Tag 🎉</Text>
             ) : (
@@ -92,48 +106,46 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           <SectionHeader title="Wichtigste Ziele" actionLabel="Alle" onAction={() => router.push('/(tabs)/ziele')} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.goalsRow}
-          >
-            {topGoals.map((goal) => (
-              <GoalCard key={goal.id} goal={goal} />
+          <View style={styles.goalsGrid}>
+            {topGoals.slice(0, 3).map((goal) => (
+              <GoalCard key={goal.id} goal={goal} variant="grid" />
             ))}
-          </ScrollView>
+          </View>
         </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Termine" />
-          <GlassCard style={styles.listCard}>
-            {nextAppointments.map((appt, i) => (
-              <React.Fragment key={appt.id}>
-                {i > 0 && <View style={styles.rowDivider} />}
-                <View style={styles.apptRow}>
-                  <View style={styles.apptIconWrap}>
-                    <Ionicons
-                      name={appt.areaKey ? AREA_ICONS[appt.areaKey] : 'calendar-outline'}
-                      size={16}
-                      color={appt.areaKey ? colors.area[appt.areaKey] : colors.accent}
-                    />
+        {nextAppointments.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="Termine" />
+            <GlassCard style={styles.listCard}>
+              {nextAppointments.map((appt, i) => (
+                <React.Fragment key={appt.id}>
+                  {i > 0 && <View style={styles.rowDivider} />}
+                  <View style={styles.apptRow}>
+                    <View style={styles.apptIconWrap}>
+                      <Ionicons
+                        name={appt.areaKey ? AREA_ICONS[appt.areaKey] : 'calendar-outline'}
+                        size={16}
+                        color={appt.areaKey ? colors.area[appt.areaKey] : colors.accent}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.apptTitle}>{appt.title}</Text>
+                      <Text style={styles.apptTime}>
+                        {formatShortDate(appt.date)} · {formatTime(appt.date)}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.apptTitle}>{appt.title}</Text>
-                    <Text style={styles.apptTime}>
-                      {formatShortDate(appt.date)} · {formatTime(appt.date)}
-                    </Text>
-                  </View>
-                </View>
-              </React.Fragment>
-            ))}
-          </GlassCard>
-        </View>
+                </React.Fragment>
+              ))}
+            </GlassCard>
+          </View>
+        )}
 
         <View style={styles.section}>
           <SectionHeader title="Schnellaktionen" />
           <View style={styles.quickRow}>
             <QuickAction icon="sparkles-outline" label="KI fragen" onPress={() => router.push('/(tabs)/ki')} />
-            <QuickAction icon="add-circle-outline" label="Ziel erstellen" onPress={() => router.push('/(tabs)/ziele')} />
+            <QuickAction icon="add-circle-outline" label="Ziel erstellen" onPress={() => router.push('/goal/new')} />
             <QuickAction icon="happy-outline" label="Stimmung" onPress={() => router.push('/(tabs)/ziele/psyche')} />
             <QuickAction icon="cash-outline" label="Ausgaben" onPress={() => router.push('/(tabs)/ziele/geld')} />
           </View>
@@ -212,20 +224,38 @@ const styles = StyleSheet.create({
   heroBreakdown: {
     flex: 1,
   },
-  focusDivider: {
-    height: StyleSheet.hairlineWidth * 1.5,
-    backgroundColor: colors.hairline,
-    marginVertical: spacing.lg,
-  },
-  focusRow: {
+  focusCard: {
+    marginHorizontal: spacing.screenX,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+  },
+  focusIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: `${colors.area.psyche}22`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  focusLabel: {
+    ...type.caption,
+    color: colors.textTertiary,
+    textTransform: 'none',
+    marginBottom: 2,
   },
   focusText: {
-    ...type.callout,
-    color: colors.textSecondary,
-    flex: 1,
+    ...type.headline,
+    color: colors.textPrimary,
+  },
+  focusArrow: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: `${colors.area.psyche}55`,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listCard: {
     marginHorizontal: spacing.screenX,
@@ -240,9 +270,11 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.hairline,
   },
-  goalsRow: {
-    paddingHorizontal: spacing.screenX,
+  goalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.md,
+    paddingHorizontal: spacing.screenX,
   },
   apptRow: {
     flexDirection: 'row',

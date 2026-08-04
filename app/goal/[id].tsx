@@ -33,6 +33,13 @@ export default function GoalDetailScreen() {
   return (
     <ScreenContainer edges={['top', 'bottom']}>
       <View style={styles.header}>
+        <AnimatedPressable
+          onPress={() => router.push({ pathname: '/goal/edit', params: { id: goal.id } })}
+          style={styles.closeButton}
+          hitSlop={8}
+        >
+          <Ionicons name="pencil" size={16} color={colors.textPrimary} />
+        </AnimatedPressable>
         <AnimatedPressable onPress={() => router.back()} style={styles.closeButton} hitSlop={8}>
           <Ionicons name="close" size={20} color={colors.textPrimary} />
         </AnimatedPressable>
@@ -93,6 +100,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: spacing.sm,
     paddingHorizontal: spacing.screenX,
     paddingTop: spacing.sm,
   },

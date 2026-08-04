@@ -25,7 +25,12 @@ export default function FuehrerscheinScreen() {
   }, [drivingLicense.examDate]);
 
   const restBudget = drivingLicense.budgetTotal - drivingLicense.costsSpent;
-  const lessonsPct = Math.round((drivingLicense.lessonsCompleted / drivingLicense.lessonsPlanned) * 100);
+  const lessonsPct =
+    drivingLicense.lessonsPlanned > 0
+      ? Math.round((drivingLicense.lessonsCompleted / drivingLicense.lessonsPlanned) * 100)
+      : 0;
+  const costPct =
+    drivingLicense.budgetTotal > 0 ? Math.round((drivingLicense.costsSpent / drivingLicense.budgetTotal) * 100) : 0;
 
   return (
     <ScreenContainer>
@@ -76,10 +81,7 @@ export default function FuehrerscheinScreen() {
           <GlassCard style={styles.statCard}>
             <Text style={styles.statValue}>{currency(restBudget)}</Text>
             <Text style={styles.statLabel}>Restbudget</Text>
-            <ProgressBar
-              value={Math.round((drivingLicense.costsSpent / drivingLicense.budgetTotal) * 100)}
-              color={colors.warning}
-            />
+            <ProgressBar value={costPct} color={colors.warning} />
           </GlassCard>
         </View>
 

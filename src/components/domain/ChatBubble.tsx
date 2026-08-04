@@ -2,11 +2,11 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { AiMessage } from '../../data/types';
+import { AiMessage, AiToolAction } from '../../data/types';
 import { colors, radius, spacing, type } from '../../theme';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
 
-export function ChatBubble({ message, onAction }: { message: AiMessage; onAction?: (kind: string) => void }) {
+export function ChatBubble({ message, onAction }: { message: AiMessage; onAction?: (action: AiToolAction) => void }) {
   const isUser = message.role === 'user';
 
   return (
@@ -31,7 +31,7 @@ export function ChatBubble({ message, onAction }: { message: AiMessage; onAction
         {message.actions && message.actions.length > 0 && (
           <View style={styles.actions}>
             {message.actions.map((action) => (
-              <AnimatedPressable key={action.kind} onPress={() => onAction?.(action.kind)} style={styles.actionChip}>
+              <AnimatedPressable key={action.label} onPress={() => onAction?.(action)} style={styles.actionChip}>
                 <Text style={styles.actionLabel}>{action.label}</Text>
               </AnimatedPressable>
             ))}

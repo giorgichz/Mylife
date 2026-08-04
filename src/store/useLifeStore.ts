@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   mockAccounts,
   mockAiMessages,
@@ -38,12 +40,17 @@ type LifeStore = {
   updateGoalProgress: (id: string, progress: number) => void;
   updateTodayMood: (field: 'mood' | 'energy' | 'motivation' | 'stress', value: number) => void;
   addTasks: (tasks: Omit<TaskItem, 'id'>[]) => void;
+  addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => Goal;
+  updateGoal: (id: string, fields: Partial<Omit<Goal, 'id' | 'createdAt'>>) => void;
+  deleteGoal: (id: string) => void;
 
   lifeScore: () => ReturnType<typeof computeLifeScore>;
   todayMoodLog: () => MoodLog;
 };
 
-export const useLifeStore = create<LifeStore>((set, get) => ({
+export const useLifeStore = create<LifeStore>()(
+  persist(
+    (set, get) => ({
   user: mockUser,
   goals: mockGoals,
   tasks: mockTasks,
@@ -74,6 +81,23 @@ export const useLifeStore = create<LifeStore>((set, get) => ({
   updateGoalProgress: (id, progress) =>
     set((state) => ({
       goals: state.goals.map((g) => (g.id === id ? { ...g, progress } : g)),
+    })),
+
+  addGoal: (goal) => {
+    const newGoal: Goal = { ...goal, id: `g-${Date.now()}`, createdAt: new Date().toISOString() };
+    set((state) => ({ goals: [...state.goals, newGoal] }));
+    return newGoal;
+  },
+
+  updateGoal: (id, fields) =>
+    set((state) => ({
+      goals: state.goals.map((g) => (g.id === id ? { ...g, ...fields } : g)),
+    })),
+
+  deleteGoal: (id) =>
+    set((state) => ({
+      goals: state.goals.filter((g) => g.id !== id && g.parentGoalId !== id),
+      tasks: state.tasks.filter((t) => t.goalId !== id),
     })),
 
   updateTodayMood: (field, value) =>
@@ -117,4 +141,23 @@ export const useLifeStore = create<LifeStore>((set, get) => ({
       budgets: state.budgets,
     });
   },
-}));
+    }),
+    {
+      name: 'mylife-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        user: state.user,
+        goals: state.goals,
+        tasks: state.tasks,
+        applications: state.applications,
+        appointments: state.appointments,
+        moodLogs: state.moodLogs,
+        accounts: state.accounts,
+        transactions: state.transactions,
+        budgets: state.budgets,
+        drivingLicense: state.drivingLicense,
+        aiMessages: state.aiMessages,
+      }),
+    }
+  )
+);

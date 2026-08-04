@@ -41,30 +41,36 @@ export default function AusbildungScreen() {
 
         <View style={styles.section}>
           <SectionHeader title="Bewerbungen" />
-          <View style={styles.appList}>
-            {applications.map((app) => {
-              const meta = STATUS_META[app.status];
-              return (
-                <GlassCard key={app.id} style={styles.appCard}>
-                  <View style={styles.appRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.appCompany}>{app.company}</Text>
-                      <Text style={styles.appRole}>{app.role}</Text>
+          {applications.length === 0 ? (
+            <GlassCard style={styles.taskCard}>
+              <Text style={styles.emptyText}>Noch keine Bewerbungen eingetragen.</Text>
+            </GlassCard>
+          ) : (
+            <View style={styles.appList}>
+              {applications.map((app) => {
+                const meta = STATUS_META[app.status];
+                return (
+                  <GlassCard key={app.id} style={styles.appCard}>
+                    <View style={styles.appRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.appCompany}>{app.company}</Text>
+                        <Text style={styles.appRole}>{app.role}</Text>
+                      </View>
+                      <Pill label={meta.label} tone={meta.tone} />
                     </View>
-                    <Pill label={meta.label} tone={meta.tone} />
-                  </View>
-                  {app.nextStep && app.nextStepDate && (
-                    <View style={styles.nextStepRow}>
-                      <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
-                      <Text style={styles.nextStepText}>
-                        {app.nextStep} · {formatShortDate(app.nextStepDate)}
-                      </Text>
-                    </View>
-                  )}
-                </GlassCard>
-              );
-            })}
-          </View>
+                    {app.nextStep && app.nextStepDate && (
+                      <View style={styles.nextStepRow}>
+                        <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
+                        <Text style={styles.nextStepText}>
+                          {app.nextStep} · {formatShortDate(app.nextStepDate)}
+                        </Text>
+                      </View>
+                    )}
+                  </GlassCard>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {areaGoals.length > 0 && (
@@ -127,6 +133,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   appCard: {},
+  emptyText: {
+    ...type.callout,
+    color: colors.textTertiary,
+    textAlign: 'center',
+  },
   appRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

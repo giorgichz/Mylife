@@ -54,19 +54,23 @@ export default function PsycheScreen() {
           </GlassCard>
         </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Stimmung · 7 Tage" />
-          <GlassCard style={styles.card}>
-            <MiniBarChart bars={moodBars} color={colors.area.psyche} />
-          </GlassCard>
-        </View>
+        {last7.length > 0 && (
+          <>
+            <View style={styles.section}>
+              <SectionHeader title="Stimmung · 7 Tage" />
+              <GlassCard style={styles.card}>
+                <MiniBarChart bars={moodBars} color={colors.area.psyche} />
+              </GlassCard>
+            </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Schlaf · 7 Tage" />
-          <GlassCard style={styles.card}>
-            <MiniBarChart bars={sleepBars} color={colors.accent} />
-          </GlassCard>
-        </View>
+            <View style={styles.section}>
+              <SectionHeader title="Schlaf · 7 Tage" />
+              <GlassCard style={styles.card}>
+                <MiniBarChart bars={sleepBars} color={colors.accent} />
+              </GlassCard>
+            </View>
+          </>
+        )}
 
         <View style={styles.section}>
           <SectionHeader title="Psyche-Score" />

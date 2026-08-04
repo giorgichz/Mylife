@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import Animated, {
   useAnimatedProps,
@@ -20,6 +20,7 @@ type Props = {
   colorTo?: string;
   trackColor?: string;
   children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
 };
 
 export function ProgressRing({
@@ -30,6 +31,7 @@ export function ProgressRing({
   colorTo = colors.accentGradient[1],
   trackColor = colors.glassFillStrong,
   children,
+  style,
 }: Props) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -48,7 +50,7 @@ export function ProgressRing({
   }));
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useLifeStore } from '../../src/store/useLifeStore';
 import { ScreenContainer } from '../../src/components/ui';
 import { AnimatedPressable } from '../../src/components/ui/AnimatedPressable';
@@ -16,7 +17,7 @@ import { ChatBubble } from '../../src/components/domain/ChatBubble';
 import { TypingIndicator } from '../../src/components/domain/TypingIndicator';
 import { simulateAiReply, AiContext } from '../../src/lib/aiSimulator';
 import { derivePsycheInsight } from '../../src/lib/insights';
-import { AiMessage } from '../../src/data/types';
+import { AiMessage, AiToolAction } from '../../src/data/types';
 import { colors, radius, spacing, type } from '../../src/theme';
 
 const SUGGESTIONS = [
@@ -27,7 +28,8 @@ const SUGGESTIONS = [
 ];
 
 export default function KiScreen() {
-  const { aiMessages, addAiMessage, addTasks, moodLogs, applications, drivingLicense, tasks, lifeScore } = useLifeStore();
+  const { aiMessages, addAiMessage, addTasks, addGoal, moodLogs, applications, drivingLicense, tasks, transactions, lifeScore } =
+    useLifeStore();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const listRef = useRef<FlatList<AiMessage>>(null);
@@ -43,11 +45,15 @@ export default function KiScreen() {
       theoryProgressPct: drivingLicense.theoryProgressPct,
       examDaysLeft: daysLeft,
       applicationsOpen: applications.filter((a) => a.status === 'gesendet' || a.status === 'gespraech').length,
-      savingsRate: 25,
+      savingsRate: (() => {
+        const income = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+        const expenses = Math.abs(transactions.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0));
+        return income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
+      })(),
       psycheInsightText: derivePsycheInsight(moodLogs).text,
       openTaskCount: tasks.filter((t) => !t.done).length,
     };
-  }, [lifeScore, drivingLicense, applications, moodLogs, tasks]);
+  }, [lifeScore, drivingLicense, applications, moodLogs, tasks, transactions]);
 
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
@@ -78,18 +84,34 @@ export default function KiScreen() {
     }, 900);
   };
 
-  const applyAction = (kind: string) => {
-    if (kind === 'generate_plan') {
+  const applyAction = (action: AiToolAction) => {
+    let confirmation = '✅ Erledigt — du findest die Änderungen jetzt in deinen Zielen.';
+
+    if (action.kind === 'create_goal' && action.payload?.title) {
+      addGoal({
+        areaKey: action.payload.areaKey ?? 'ausbildung',
+        title: action.payload.title,
+        status: 'active',
+        priority: 'medium',
+        progress: 0,
+        deadline: action.payload.deadline,
+      });
+      confirmation = `✅ Ziel „${action.payload.title}" wurde angelegt — du findest es unter „Ziele".`;
+    } else if (action.kind === 'create_goal') {
+      router.push('/goal/new');
+      return;
+    } else if (action.kind === 'generate_plan') {
       addTasks([
-        { areaKey: 'fuehrerschein', title: 'Theorie: 30 Testfragen üben', done: false },
-        { areaKey: 'ausbildung', title: 'Bewerbung Stadtwerke nachfassen', done: false },
-        { areaKey: 'psyche', title: 'Um 22:30 Uhr Bildschirmzeit beenden', done: false },
+        { areaKey: 'fuehrerschein', title: 'Theorie: 20 Testfragen üben', done: false },
+        { areaKey: 'ausbildung', title: 'Nächsten Bewerbungsschritt erledigen', done: false },
+        { areaKey: 'psyche', title: 'Feste Schlafenszeit einhalten', done: false },
       ]);
     }
+
     addAiMessage({
       id: `a-${Date.now()}`,
       role: 'assistant',
-      content: '✅ Erledigt — du findest die Änderungen jetzt in deinen Zielen.',
+      content: confirmation,
       createdAt: new Date().toISOString(),
     });
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
