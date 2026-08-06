@@ -14,7 +14,7 @@ import {
   mockTransactions,
   mockUser,
 } from '../data/mock';
-import { AiMessage, Goal, MoodLog, TaskItem } from '../data/types';
+import { AiMessage, Application, Goal, MoodLog, TaskItem } from '../data/types';
 import { computeLifeScore } from '../lib/lifeScore';
 
 /**
@@ -40,9 +40,14 @@ type LifeStore = {
   updateGoalProgress: (id: string, progress: number) => void;
   updateTodayMood: (field: 'mood' | 'energy' | 'motivation' | 'stress', value: number) => void;
   addTasks: (tasks: Omit<TaskItem, 'id'>[]) => void;
+  deleteTask: (id: string) => void;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => Goal;
   updateGoal: (id: string, fields: Partial<Omit<Goal, 'id' | 'createdAt'>>) => void;
   deleteGoal: (id: string) => void;
+  addApplication: (application: Omit<Application, 'id'>) => Application;
+  updateApplication: (id: string, fields: Partial<Omit<Application, 'id'>>) => void;
+  deleteApplication: (id: string) => void;
+  updateUserName: (firstName: string) => void;
 
   lifeScore: () => ReturnType<typeof computeLifeScore>;
   todayMoodLog: () => MoodLog;
@@ -74,8 +79,13 @@ export const useLifeStore = create<LifeStore>()(
     set((state) => ({
       tasks: [
         ...state.tasks,
-        ...tasks.map((t, i) => ({ ...t, id: `t-ai-${Date.now()}-${i}` })),
+        ...tasks.map((t, i) => ({ ...t, id: `t-${Date.now()}-${i}` })),
       ],
+    })),
+
+  deleteTask: (id) =>
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== id),
     })),
 
   updateGoalProgress: (id, progress) =>
@@ -99,6 +109,25 @@ export const useLifeStore = create<LifeStore>()(
       goals: state.goals.filter((g) => g.id !== id && g.parentGoalId !== id),
       tasks: state.tasks.filter((t) => t.goalId !== id),
     })),
+
+  addApplication: (application) => {
+    const newApplication: Application = { ...application, id: `app-${Date.now()}` };
+    set((state) => ({ applications: [...state.applications, newApplication] }));
+    return newApplication;
+  },
+
+  updateApplication: (id, fields) =>
+    set((state) => ({
+      applications: state.applications.map((a) => (a.id === id ? { ...a, ...fields } : a)),
+    })),
+
+  deleteApplication: (id) =>
+    set((state) => ({
+      applications: state.applications.filter((a) => a.id !== id),
+    })),
+
+  updateUserName: (firstName) =>
+    set((state) => ({ user: { ...state.user, firstName } })),
 
   updateTodayMood: (field, value) =>
     set((state) => {

@@ -17,6 +17,7 @@ export default function GoalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const goals = useLifeStore((s) => s.goals);
   const allTasks = useLifeStore((s) => s.tasks);
+  const updateGoal = useLifeStore((s) => s.updateGoal);
   const goal = useMemo(() => goals.find((g) => g.id === id), [goals, id]);
   const tasks = useMemo(() => allTasks.filter((t) => t.goalId === id), [allTasks, id]);
 
@@ -53,6 +54,7 @@ export default function GoalDetailScreen() {
         <Text style={styles.title}>{goal.title}</Text>
 
         <View style={styles.metaRow}>
+          {goal.status === 'done' && <Pill label="Erledigt" tone="success" />}
           <Pill label={PRIORITY_LABEL[goal.priority]} tone={PRIORITY_TONE[goal.priority]} />
           {goal.deadline && <Pill label={`bis ${formatShortDate(goal.deadline)}`} />}
         </View>
@@ -85,9 +87,27 @@ export default function GoalDetailScreen() {
         )}
 
         <Button
+          label={goal.status === 'done' ? 'Wieder aktivieren' : 'Als erledigt markieren'}
+          style={{ marginTop: spacing.xxl }}
+          icon={
+            <Ionicons
+              name={goal.status === 'done' ? 'refresh' : 'checkmark-circle-outline'}
+              size={18}
+              color={colors.textInverse}
+            />
+          }
+          onPress={() =>
+            updateGoal(goal.id, {
+              status: goal.status === 'done' ? 'active' : 'done',
+              progress: goal.status === 'done' ? goal.progress : 100,
+            })
+          }
+        />
+
+        <Button
           label="Mit KI besprechen"
           variant="secondary"
-          style={{ marginTop: spacing.xxl }}
+          style={{ marginTop: spacing.md }}
           icon={<Ionicons name="sparkles-outline" size={18} color={colors.textPrimary} />}
           onPress={() => router.replace('/(tabs)/ki')}
         />

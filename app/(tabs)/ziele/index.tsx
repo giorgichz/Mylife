@@ -21,6 +21,7 @@ export default function ZieleScreen() {
   const { goals, lifeScore } = useLifeStore();
   const score = lifeScore();
   const activeGoals = goals.filter((g) => g.status === 'active' && !g.parentGoalId);
+  const doneGoals = goals.filter((g) => g.status === 'done');
 
   return (
     <ScreenContainer>
@@ -54,12 +55,27 @@ export default function ZieleScreen() {
 
         <View style={styles.section}>
           <SectionHeader title="Aktive Ziele" />
-          <View style={styles.list}>
-            {activeGoals.map((goal) => (
-              <GoalCard key={goal.id} goal={goal} width="100%" />
-            ))}
-          </View>
+          {activeGoals.length === 0 ? (
+            <Text style={styles.emptyText}>Noch keine Ziele. Leg mit dem + Button dein erstes an.</Text>
+          ) : (
+            <View style={styles.list}>
+              {activeGoals.map((goal) => (
+                <GoalCard key={goal.id} goal={goal} width="100%" />
+              ))}
+            </View>
+          )}
         </View>
+
+        {doneGoals.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title={`Erledigt (${doneGoals.length})`} />
+            <View style={styles.list}>
+              {doneGoals.map((goal) => (
+                <GoalCard key={goal.id} goal={goal} width="100%" />
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </ScreenContainer>
   );
@@ -118,5 +134,10 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: spacing.screenX,
     gap: spacing.md,
+  },
+  emptyText: {
+    ...type.callout,
+    color: colors.textTertiary,
+    paddingHorizontal: spacing.screenX,
   },
 });

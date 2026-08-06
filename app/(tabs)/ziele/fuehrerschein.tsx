@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLifeStore } from '../../../src/store/useLifeStore';
 import { ScreenContainer, GlassCard, SectionHeader } from '../../../src/components/ui';
@@ -7,6 +8,7 @@ import { ProgressRing } from '../../../src/components/ui/ProgressRing';
 import { ProgressBar } from '../../../src/components/ui/ProgressBar';
 import { DomainHeader } from '../../../src/components/domain/DomainHeader';
 import { TaskRow } from '../../../src/components/domain/TaskRow';
+import { AnimatedPressable } from '../../../src/components/ui/AnimatedPressable';
 import { colors, spacing, type } from '../../../src/theme';
 import { formatShortDate } from '../../../src/lib/greeting';
 
@@ -85,19 +87,26 @@ export default function FuehrerscheinScreen() {
           </GlassCard>
         </View>
 
-        {areaTasks.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title="Lernplan" />
-            <GlassCard>
-              {areaTasks.map((task, i) => (
-                <React.Fragment key={task.id}>
-                  {i > 0 && <View style={styles.divider} />}
-                  <TaskRow task={task} onToggle={toggleTask} />
-                </React.Fragment>
-              ))}
-            </GlassCard>
-          </View>
-        )}
+        <View style={styles.section}>
+          <SectionHeader title="Lernplan" />
+          <GlassCard>
+            {areaTasks.map((task, i) => (
+              <React.Fragment key={task.id}>
+                {i > 0 && <View style={styles.divider} />}
+                <TaskRow task={task} onToggle={toggleTask} />
+              </React.Fragment>
+            ))}
+            {areaTasks.length > 0 && <View style={styles.divider} />}
+            <AnimatedPressable
+              onPress={() => router.push({ pathname: '/task/new', params: { area: 'fuehrerschein' } })}
+              style={styles.addRow}
+              scaleTo={0.99}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
+              <Text style={styles.addRowText}>Aufgabe hinzufügen</Text>
+            </AnimatedPressable>
+          </GlassCard>
+        </View>
 
         <View style={[styles.section, { marginBottom: 0 }]}>
           <SectionHeader title="Kosten" />
@@ -186,6 +195,16 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.hairline,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 12,
+  },
+  addRowText: {
+    ...type.callout,
+    color: colors.accent,
   },
   costRow: {
     flexDirection: 'row',

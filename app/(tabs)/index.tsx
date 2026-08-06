@@ -101,6 +101,11 @@ export default function HomeScreen() {
                 </React.Fragment>
               ))
             )}
+            {todayTasks.length > 0 && <View style={styles.rowDivider} />}
+            <AnimatedPressable onPress={() => router.push('/task/new')} style={styles.addTaskRow} scaleTo={0.99}>
+              <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
+              <Text style={styles.addTaskText}>Aufgabe hinzufügen</Text>
+            </AnimatedPressable>
           </GlassCard>
         </View>
 
@@ -269,6 +274,16 @@ const styles = StyleSheet.create({
   rowDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.hairline,
+  },
+  addTaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 12,
+  },
+  addTaskText: {
+    ...type.callout,
+    color: colors.accent,
   },
   goalsGrid: {
     flexDirection: 'row',

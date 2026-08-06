@@ -63,3 +63,44 @@ export function parseGoalIntent(input: string): ParsedGoalIntent | undefined {
 
   return { title: capitalized, areaKey, deadline };
 }
+
+const COMPLETION_PATTERNS = [
+  /(?:ich\s+)?(?:hab|habe)\s+(.+?)\s+(?:geschafft|erledigt|abgeschlossen|fertig)/i,
+  /markiere\s+(.+?)\s+als\s+erledigt/i,
+  /schließe\s+(.+?)\s+ab/i,
+  /(.+?)\s+ist\s+(?:geschafft|erledigt|fertig|abgeschlossen)/i,
+];
+
+export type GoalMatch = { id: string; title: string };
+
+/** Detects "ich hab X geschafft" style text and fuzzy-matches it against real goal titles. */
+export function parseCompletionIntent(input: string, goals: GoalMatch[]): GoalMatch | undefined {
+  const trimmed = input.trim();
+  let fragment: string | undefined;
+
+  for (const pattern of COMPLETION_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) {
+      fragment = match[1].trim().toLowerCase();
+      break;
+    }
+  }
+  if (!fragment || fragment.length < 3) return undefined;
+
+  const normalize = (s: string) => s.toLowerCase().replace(/[.,!?]/g, '').trim();
+  const fragmentWords = normalize(fragment).split(/\s+/).filter((w) => w.length > 2);
+
+  let best: { goal: GoalMatch; score: number } | undefined;
+  for (const goal of goals) {
+    const title = normalize(goal.title);
+    if (title.includes(normalize(fragment)) || normalize(fragment).includes(title)) {
+      return goal;
+    }
+    const overlap = fragmentWords.filter((w) => title.includes(w)).length;
+    if (overlap > 0 && (!best || overlap > best.score)) {
+      best = { goal, score: overlap };
+    }
+  }
+
+  return best && best.score >= Math.max(1, fragmentWords.length - 1) ? best.goal : undefined;
+}

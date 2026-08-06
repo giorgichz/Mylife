@@ -5,20 +5,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLifeStore } from '../../src/store/useLifeStore';
 import { ScreenContainer } from '../../src/components/ui';
 import { AnimatedPressable } from '../../src/components/ui/AnimatedPressable';
-import { GoalForm } from '../../src/components/domain/GoalForm';
+import { ApplicationForm } from '../../src/components/domain/ApplicationForm';
 import { colors, spacing, type } from '../../src/theme';
 
-export default function EditGoalScreen() {
+export default function EditApplicationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const goals = useLifeStore((s) => s.goals);
-  const updateGoal = useLifeStore((s) => s.updateGoal);
-  const deleteGoal = useLifeStore((s) => s.deleteGoal);
-  const goal = useMemo(() => goals.find((g) => g.id === id), [goals, id]);
+  const applications = useLifeStore((s) => s.applications);
+  const updateApplication = useLifeStore((s) => s.updateApplication);
+  const deleteApplication = useLifeStore((s) => s.deleteApplication);
+  const application = useMemo(() => applications.find((a) => a.id === id), [applications, id]);
 
-  if (!goal) {
+  if (!application) {
     return (
       <ScreenContainer>
-        <Text style={styles.notFound}>Ziel nicht gefunden.</Text>
+        <Text style={styles.notFound}>Bewerbung nicht gefunden.</Text>
       </ScreenContainer>
     );
   }
@@ -26,22 +26,21 @@ export default function EditGoalScreen() {
   return (
     <ScreenContainer edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Ziel bearbeiten</Text>
+        <Text style={styles.title}>Bewerbung bearbeiten</Text>
         <AnimatedPressable onPress={() => router.back()} style={styles.closeButton} hitSlop={8}>
           <Ionicons name="close" size={20} color={colors.textPrimary} />
         </AnimatedPressable>
       </View>
-      <GoalForm
-        initialGoal={goal}
-        existingGoals={goals}
+      <ApplicationForm
+        initialApplication={application}
         submitLabel="Änderungen speichern"
         onSubmit={(values) => {
-          updateGoal(goal.id, values);
+          updateApplication(application.id, values);
           router.back();
         }}
         onDelete={() => {
-          deleteGoal(goal.id);
-          router.dismissTo('/(tabs)/ziele');
+          deleteApplication(application.id);
+          router.back();
         }}
       />
     </ScreenContainer>

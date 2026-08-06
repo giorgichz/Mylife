@@ -28,8 +28,20 @@ const SUGGESTIONS = [
 ];
 
 export default function KiScreen() {
-  const { aiMessages, addAiMessage, addTasks, addGoal, moodLogs, applications, drivingLicense, tasks, transactions, lifeScore } =
-    useLifeStore();
+  const {
+    aiMessages,
+    addAiMessage,
+    addTasks,
+    addGoal,
+    updateGoal,
+    goals,
+    moodLogs,
+    applications,
+    drivingLicense,
+    tasks,
+    transactions,
+    lifeScore,
+  } = useLifeStore();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const listRef = useRef<FlatList<AiMessage>>(null);
@@ -52,8 +64,9 @@ export default function KiScreen() {
       })(),
       psycheInsightText: derivePsycheInsight(moodLogs).text,
       openTaskCount: tasks.filter((t) => !t.done).length,
+      activeGoals: goals.filter((g) => g.status === 'active').map((g) => ({ id: g.id, title: g.title })),
     };
-  }, [lifeScore, drivingLicense, applications, moodLogs, tasks, transactions]);
+  }, [lifeScore, drivingLicense, applications, moodLogs, tasks, transactions, goals]);
 
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
@@ -100,12 +113,40 @@ export default function KiScreen() {
     } else if (action.kind === 'create_goal') {
       router.push('/goal/new');
       return;
+    } else if (action.kind === 'update_goal' && action.payload?.goalId && action.payload.status) {
+      const targetGoal = goals.find((g) => g.id === action.payload?.goalId);
+      updateGoal(
+        action.payload.goalId,
+        action.payload.status === 'done' ? { status: 'done', progress: 100 } : { status: action.payload.status }
+      );
+      confirmation = targetGoal
+        ? `✅ „${targetGoal.title}" ist jetzt als erledigt markiert. Gut gemacht!`
+        : '✅ Erledigt.';
     } else if (action.kind === 'generate_plan') {
-      addTasks([
-        { areaKey: 'fuehrerschein', title: 'Theorie: 20 Testfragen üben', done: false },
-        { areaKey: 'ausbildung', title: 'Nächsten Bewerbungsschritt erledigen', done: false },
-        { areaKey: 'psyche', title: 'Feste Schlafenszeit einhalten', done: false },
-      ]);
+      const priorityWeight = { high: 0, medium: 1, low: 2 } as const;
+      const openGoals = goals
+        .filter((g) => g.status === 'active')
+        .filter((g) => !tasks.some((t) => t.goalId === g.id && !t.done))
+        .sort((a, b) => priorityWeight[a.priority] - priorityWeight[b.priority])
+        .slice(0, 3);
+
+      if (openGoals.length > 0) {
+        addTasks(
+          openGoals.map((g) => ({
+            areaKey: g.areaKey,
+            goalId: g.id,
+            title: `Nächster Schritt: ${g.title}`,
+            done: false,
+            dueDate: new Date().toISOString(),
+          }))
+        );
+        confirmation = `✅ ${openGoals.length} Aufgabe${openGoals.length > 1 ? 'n' : ''} für deine wichtigsten Ziele angelegt — du findest sie unter „Heute erledigen".`;
+      } else {
+        confirmation =
+          goals.filter((g) => g.status === 'active').length === 0
+            ? 'Du hast noch keine aktiven Ziele. Leg zuerst eins an, dann kann ich einen Plan erstellen.'
+            : 'Für alle deine aktiven Ziele gibt es schon offene Aufgaben — nichts Neues zu planen.';
+      }
     }
 
     addAiMessage({

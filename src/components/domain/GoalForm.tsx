@@ -19,17 +19,21 @@ export type GoalFormValues = {
   areaKey: AreaKey;
   priority: Priority;
   deadline?: string;
+  parentGoalId?: string;
 };
 
 export function GoalForm({
   initialGoal,
   presetArea,
+  existingGoals = [],
   onSubmit,
   onDelete,
   submitLabel = 'Ziel speichern',
 }: {
   initialGoal?: Goal;
   presetArea?: AreaKey;
+  /** Used to build the "übergeordnetes Ziel" picker — pass the full goals list. */
+  existingGoals?: Goal[];
   onSubmit: (values: GoalFormValues) => void;
   onDelete?: () => void;
   submitLabel?: string;
@@ -39,8 +43,14 @@ export function GoalForm({
   const [priority, setPriority] = useState<Priority>(initialGoal?.priority ?? 'medium');
   const [deadlineInput, setDeadlineInput] = useState(formatDateForInput(initialGoal?.deadline));
   const [deadlineError, setDeadlineError] = useState(false);
+  const [parentGoalId, setParentGoalId] = useState<string | undefined>(initialGoal?.parentGoalId);
 
   const canSubmit = title.trim().length > 0;
+
+  // Only one level of nesting, same area, excluding self.
+  const parentCandidates = existingGoals.filter(
+    (g) => g.areaKey === areaKey && g.id !== initialGoal?.id && !g.parentGoalId
+  );
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -52,7 +62,7 @@ export function GoalForm({
         return;
       }
     }
-    onSubmit({ title: title.trim(), areaKey, priority, deadline });
+    onSubmit({ title: title.trim(), areaKey, priority, deadline, parentGoalId });
   };
 
   return (
@@ -76,7 +86,13 @@ export function GoalForm({
           const active = area === areaKey;
           const color = colors.area[area];
           return (
-            <AnimatedPressable key={area} onPress={() => setAreaKey(area)}>
+            <AnimatedPressable
+              key={area}
+              onPress={() => {
+                setAreaKey(area);
+                setParentGoalId(undefined);
+              }}
+            >
               <View
                 style={[
                   styles.chip,
@@ -105,6 +121,31 @@ export function GoalForm({
           );
         })}
       </View>
+
+      {parentCandidates.length > 0 && (
+        <>
+          <Text style={styles.label}>Übergeordnetes Ziel (optional)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <AnimatedPressable onPress={() => setParentGoalId(undefined)}>
+              <View style={[styles.chip, !parentGoalId && styles.chipActive]}>
+                <Text style={[styles.chipLabel, !parentGoalId && styles.chipLabelActive]}>Kein</Text>
+              </View>
+            </AnimatedPressable>
+            {parentCandidates.map((g) => {
+              const active = g.id === parentGoalId;
+              return (
+                <AnimatedPressable key={g.id} onPress={() => setParentGoalId(g.id)}>
+                  <View style={[styles.chip, active && styles.chipActive]}>
+                    <Text style={[styles.chipLabel, active && styles.chipLabelActive]} numberOfLines={1}>
+                      {g.title.length > 28 ? `${g.title.slice(0, 28)}…` : g.title}
+                    </Text>
+                  </View>
+                </AnimatedPressable>
+              );
+            })}
+          </ScrollView>
+        </>
+      )}
 
       <Text style={styles.label}>Deadline (optional)</Text>
       <GlassCard style={styles.inputCard}>

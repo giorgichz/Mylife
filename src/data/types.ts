@@ -108,6 +108,8 @@ export type AiToolAction = {
     title?: string;
     areaKey?: AreaKey;
     deadline?: string;
+    goalId?: string;
+    status?: GoalStatus;
   };
 };
 

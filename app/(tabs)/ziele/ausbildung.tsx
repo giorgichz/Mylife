@@ -1,8 +1,10 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLifeStore } from '../../../src/store/useLifeStore';
 import { ScreenContainer, GlassCard, SectionHeader, Pill } from '../../../src/components/ui';
+import { AnimatedPressable } from '../../../src/components/ui/AnimatedPressable';
 import { DomainHeader } from '../../../src/components/domain/DomainHeader';
 import { GoalCard } from '../../../src/components/domain/GoalCard';
 import { TaskRow } from '../../../src/components/domain/TaskRow';
@@ -40,7 +42,7 @@ export default function AusbildungScreen() {
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Bewerbungen" />
+          <SectionHeader title="Bewerbungen" actionLabel="+ Neu" onAction={() => router.push('/application/new')} />
           {applications.length === 0 ? (
             <GlassCard style={styles.taskCard}>
               <Text style={styles.emptyText}>Noch keine Bewerbungen eingetragen.</Text>
@@ -50,23 +52,28 @@ export default function AusbildungScreen() {
               {applications.map((app) => {
                 const meta = STATUS_META[app.status];
                 return (
-                  <GlassCard key={app.id} style={styles.appCard}>
-                    <View style={styles.appRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.appCompany}>{app.company}</Text>
-                        <Text style={styles.appRole}>{app.role}</Text>
+                  <AnimatedPressable
+                    key={app.id}
+                    onPress={() => router.push({ pathname: '/application/edit', params: { id: app.id } })}
+                  >
+                    <GlassCard style={styles.appCard}>
+                      <View style={styles.appRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.appCompany}>{app.company}</Text>
+                          <Text style={styles.appRole}>{app.role}</Text>
+                        </View>
+                        <Pill label={meta.label} tone={meta.tone} />
                       </View>
-                      <Pill label={meta.label} tone={meta.tone} />
-                    </View>
-                    {app.nextStep && app.nextStepDate && (
-                      <View style={styles.nextStepRow}>
-                        <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
-                        <Text style={styles.nextStepText}>
-                          {app.nextStep} · {formatShortDate(app.nextStepDate)}
-                        </Text>
-                      </View>
-                    )}
-                  </GlassCard>
+                      {app.nextStep && app.nextStepDate && (
+                        <View style={styles.nextStepRow}>
+                          <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
+                          <Text style={styles.nextStepText}>
+                            {app.nextStep} · {formatShortDate(app.nextStepDate)}
+                          </Text>
+                        </View>
+                      )}
+                    </GlassCard>
+                  </AnimatedPressable>
                 );
               })}
             </View>
@@ -84,19 +91,26 @@ export default function AusbildungScreen() {
           </View>
         )}
 
-        {areaTasks.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title="Aufgaben" />
-            <GlassCard style={styles.taskCard}>
-              {areaTasks.map((task, i) => (
-                <React.Fragment key={task.id}>
-                  {i > 0 && <View style={styles.divider} />}
-                  <TaskRow task={task} onToggle={toggleTask} />
-                </React.Fragment>
-              ))}
-            </GlassCard>
-          </View>
-        )}
+        <View style={styles.section}>
+          <SectionHeader title="Aufgaben" />
+          <GlassCard style={styles.taskCard}>
+            {areaTasks.map((task, i) => (
+              <React.Fragment key={task.id}>
+                {i > 0 && <View style={styles.divider} />}
+                <TaskRow task={task} onToggle={toggleTask} />
+              </React.Fragment>
+            ))}
+            {areaTasks.length > 0 && <View style={styles.divider} />}
+            <AnimatedPressable
+              onPress={() => router.push({ pathname: '/task/new', params: { area: 'ausbildung' } })}
+              style={styles.addRow}
+              scaleTo={0.99}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
+              <Text style={styles.addRowText}>Aufgabe hinzufügen</Text>
+            </AnimatedPressable>
+          </GlassCard>
+        </View>
       </ScrollView>
     </ScreenContainer>
   );
@@ -173,5 +187,15 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.hairline,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 12,
+  },
+  addRowText: {
+    ...type.callout,
+    color: colors.accent,
   },
 });

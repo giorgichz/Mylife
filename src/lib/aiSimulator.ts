@@ -1,5 +1,5 @@
 import { AiToolAction } from '../data/types';
-import { parseGoalIntent } from './goalIntent';
+import { parseGoalIntent, parseCompletionIntent, GoalMatch } from './goalIntent';
 
 /**
  * Local stand-in for the real Claude tool-use flow (see ARCHITECTURE.md §4).
@@ -19,6 +19,7 @@ export type AiContext = {
   savingsRate: number;
   psycheInsightText: string;
   openTaskCount: number;
+  activeGoals: GoalMatch[];
 };
 
 export type AiReply = {
@@ -70,7 +71,9 @@ const rules: { test: RegExp; reply: (ctx: AiContext) => AiReply }[] = [
       content:
         ctx.openTaskCount > 0
           ? `Klar, ich erstelle dir einen Plan für die nächsten 7 Tage basierend auf deinen ${ctx.openTaskCount} offenen Aufgaben und Prioritäten.`
-          : `Du hast aktuell keine offenen Aufgaben. Leg zuerst ein Ziel an (z. B. „Ich möchte bis September meinen Führerschein schaffen"), dann erstelle ich dir daraus einen Plan.`,
+          : ctx.activeGoals.length > 0
+            ? `Du hast noch keine offenen Aufgaben. Ich leite dir welche aus deinen aktiven Zielen ab.`
+            : `Du hast aktuell keine offenen Aufgaben. Leg zuerst ein Ziel an (z. B. „Ich möchte bis September meinen Führerschein schaffen"), dann erstelle ich dir daraus einen Plan.`,
       actions: [{ kind: 'generate_plan', label: 'Wochenplan erstellen' }],
     }),
   },
@@ -84,6 +87,20 @@ const rules: { test: RegExp; reply: (ctx: AiContext) => AiReply }[] = [
 ];
 
 export function simulateAiReply(input: string, ctx: AiContext): AiReply {
+  const completedGoal = parseCompletionIntent(input, ctx.activeGoals);
+  if (completedGoal) {
+    return {
+      content: `Glückwunsch! Ich markiere „${completedGoal.title}" als erledigt.`,
+      actions: [
+        {
+          kind: 'update_goal',
+          label: `„${completedGoal.title}" als erledigt markieren`,
+          payload: { goalId: completedGoal.id, status: 'done' },
+        },
+      ],
+    };
+  }
+
   const goalIntent = parseGoalIntent(input);
   if (goalIntent) {
     return {

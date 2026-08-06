@@ -1,17 +1,27 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLifeStore } from '../../src/store/useLifeStore';
 import { ScreenContainer, GlassCard, SectionHeader } from '../../src/components/ui';
+import { AnimatedPressable } from '../../src/components/ui/AnimatedPressable';
 import { SettingsRow } from '../../src/components/domain/SettingsRow';
 import { colors, spacing, type } from '../../src/theme';
 
 export default function ProfilScreen() {
-  const { user, lifeScore } = useLifeStore();
+  const { user, lifeScore, updateUserName } = useLifeStore();
   const score = lifeScore();
   const [faceId, setFaceId] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [dailyCheckin, setDailyCheckin] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(user.firstName);
+
+  const saveName = () => {
+    const trimmed = nameInput.trim();
+    if (trimmed.length > 0) updateUserName(trimmed);
+    else setNameInput(user.firstName);
+    setEditingName(false);
+  };
 
   return (
     <ScreenContainer>
@@ -23,7 +33,32 @@ export default function ProfilScreen() {
             <View style={styles.avatar}>
               <Text style={styles.avatarInitial}>{user.firstName.charAt(0)}</Text>
             </View>
-            <Text style={styles.name}>{user.firstName}</Text>
+            {editingName ? (
+              <View style={styles.nameEditRow}>
+                <TextInput
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  style={styles.nameInput}
+                  autoFocus
+                  onSubmitEditing={saveName}
+                  placeholderTextColor={colors.textTertiary}
+                />
+                <AnimatedPressable onPress={saveName} hitSlop={8}>
+                  <Ionicons name="checkmark-circle" size={26} color={colors.success} />
+                </AnimatedPressable>
+              </View>
+            ) : (
+              <AnimatedPressable
+                onPress={() => {
+                  setNameInput(user.firstName);
+                  setEditingName(true);
+                }}
+                style={styles.nameRow}
+              >
+                <Text style={styles.name}>{user.firstName}</Text>
+                <Ionicons name="pencil" size={14} color={colors.textTertiary} />
+              </AnimatedPressable>
+            )}
             <Text style={styles.scoreText}>Life Score {score.overall}%</Text>
           </GlassCard>
         </View>
@@ -33,7 +68,7 @@ export default function ProfilScreen() {
           <GlassCard>
             <SettingsRow icon="finger-print-outline" label="Face ID" kind="toggle" value={faceId} onToggle={setFaceId} iconColor={colors.success} />
             <View style={styles.divider} />
-            <SettingsRow icon="cloud-outline" label="Cloud Sync" kind="nav" value="Aktiv" />
+            <SettingsRow icon="cloud-outline" label="Cloud Sync" kind="nav" value="Nur lokal" iconColor={colors.warning} />
           </GlassCard>
         </View>
 
@@ -101,6 +136,25 @@ const styles = StyleSheet.create({
   name: {
     ...type.title2,
     color: colors.textPrimary,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  nameEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  nameInput: {
+    ...type.title2,
+    color: colors.textPrimary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent,
+    paddingVertical: 2,
+    minWidth: 120,
+    textAlign: 'center',
   },
   scoreText: {
     ...type.footnote,

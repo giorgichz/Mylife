@@ -12,6 +12,7 @@ import { colors, spacing, type } from '../../src/theme';
 export default function NewGoalScreen() {
   const { area } = useLocalSearchParams<{ area?: AreaKey }>();
   const addGoal = useLifeStore((s) => s.addGoal);
+  const goals = useLifeStore((s) => s.goals);
 
   return (
     <ScreenContainer edges={['top', 'bottom']}>
@@ -23,6 +24,7 @@ export default function NewGoalScreen() {
       </View>
       <GoalForm
         presetArea={area}
+        existingGoals={goals}
         submitLabel="Ziel anlegen"
         onSubmit={(values) => {
           addGoal({ ...values, status: 'active', progress: 0 });
