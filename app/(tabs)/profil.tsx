@@ -5,11 +5,16 @@ import { useLifeStore } from '../../src/store/useLifeStore';
 import { ScreenContainer, GlassCard, SectionHeader } from '../../src/components/ui';
 import { AnimatedPressable } from '../../src/components/ui/AnimatedPressable';
 import { SettingsRow } from '../../src/components/domain/SettingsRow';
+import { useAuth } from '../../src/lib/AuthProvider';
 import { colors, spacing, type } from '../../src/theme';
 
 export default function ProfilScreen() {
   const { user, lifeScore, updateUserName } = useLifeStore();
+  const { session, ready, error } = useAuth();
   const score = lifeScore();
+
+  const cloudSyncLabel = !ready ? 'Verbinde…' : session && !error ? 'Aktiv' : 'Nur lokal';
+  const cloudSyncColor = !ready ? colors.textSecondary : session && !error ? colors.success : colors.warning;
   const [faceId, setFaceId] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [dailyCheckin, setDailyCheckin] = useState(true);
@@ -68,7 +73,7 @@ export default function ProfilScreen() {
           <GlassCard>
             <SettingsRow icon="finger-print-outline" label="Face ID" kind="toggle" value={faceId} onToggle={setFaceId} iconColor={colors.success} />
             <View style={styles.divider} />
-            <SettingsRow icon="cloud-outline" label="Cloud Sync" kind="nav" value="Nur lokal" iconColor={colors.warning} />
+            <SettingsRow icon="cloud-outline" label="Cloud Sync" kind="nav" value={cloudSyncLabel} iconColor={cloudSyncColor} />
           </GlassCard>
         </View>
 
