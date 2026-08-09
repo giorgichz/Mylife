@@ -1,0 +1,269 @@
+// Free-tier LLM bridge for the Mylife KI-Assistent (Groq, OpenAI-compatible
+// tool calling). Runs server-side so the Groq API key never reaches the
+// client bundle. This function never writes to the database itself — it
+// only proposes AiToolAction objects that the app applies locally after the
+// user taps to confirm, same pattern the local heuristic matcher already
+// used, so a bad model turn can never silently mutate data.
+
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const MODEL = 'llama-3.3-70b-versatile';
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+type AreaKey = 'ausbildung' | 'psyche' | 'geld' | 'fuehrerschein';
+type Priority = 'low' | 'medium' | 'high';
+
+type GoalContext = {
+  id: string;
+  title: string;
+  areaKey: AreaKey;
+  status: 'active' | 'done' | 'paused';
+  priority: Priority;
+  progress: number;
+  deadline?: string;
+};
+
+type RequestBody = {
+  message: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+  context: {
+    goals: GoalContext[];
+    tasks: { id: string; title: string; done: boolean; dueDate?: string; goalId?: string }[];
+    overallScore: number;
+    areaScores: Record<AreaKey, number>;
+    moodToday: { mood: number; energy: number; motivation: number; stress: number; sleep: number } | null;
+    applicationsOpen: number;
+    theoryProgressPct: number;
+    examDaysLeft: number | null;
+    savingsRate: number;
+  };
+};
+
+const TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'create_goal',
+      description: 'Legt ein neues Ziel für den Nutzer an.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Kurzer, konkreter Zieltitel auf Deutsch.' },
+          areaKey: { type: 'string', enum: ['ausbildung', 'psyche', 'geld', 'fuehrerschein'] },
+          deadline: { type: 'string', description: 'ISO-Datum, optional.' },
+        },
+        required: ['title', 'areaKey'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_goal',
+      description: 'Ändert Titel, Deadline, Status oder Fortschritt eines bestehenden Ziels.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goalId: { type: 'string', description: 'Exakte id aus dem Kontext, niemals erfinden.' },
+          title: { type: 'string' },
+          deadline: { type: 'string', description: 'ISO-Datum' },
+          status: { type: 'string', enum: ['active', 'done', 'paused'] },
+          progress: { type: 'number', minimum: 0, maximum: 100 },
+        },
+        required: ['goalId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_priority',
+      description: 'Setzt die Priorität eines Ziels.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goalId: { type: 'string' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+        },
+        required: ['goalId', 'priority'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_goal',
+      description: 'Löscht ein oder mehrere Ziele, z. B. bei "lösche alle Ziele außer X".',
+      parameters: {
+        type: 'object',
+        properties: {
+          goalIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Exakte ids aus dem Kontext, niemals erfinden.',
+          },
+        },
+        required: ['goalIds'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_plan',
+      description: 'Erstellt für heute Aufgaben aus den wichtigsten aktiven Zielen, die noch keine offene Aufgabe haben.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'reschedule_today',
+      description:
+        'Verschiebt die heutigen offenen Aufgaben auf morgen — z. B. wenn der Nutzer sagt, er hat heute keine Zeit oder Kraft mehr.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+] as const;
+
+function systemPrompt(ctx: RequestBody['context']): string {
+  return `Du bist die KI in der App "Mylife" – ein persönlicher Lebensassistent für vier Lebensbereiche: Ausbildung, Psyche, Geld, Führerschein.
+
+Sprich immer auf Deutsch, natürlich, warm und kurz — wie ein kluger Freund, nicht wie ein Kundenservice-Bot. Auf ein einfaches "Hey" antwortest du locker und fragst z. B. wie's läuft, ohne sofort ein Ziel vorzuschlagen. Bei Dingen wie "heute schlecht geschlafen" reagierst du zuerst einfühlsam und schlägst dann, wenn es wirklich passt, eine kleine konkrete Anpassung vor (z. B. heutige Aufgaben verschieben, ein Psyche-Ziel anlegen) — dräng nichts auf.
+
+Du kennst die aktuellen Daten des Nutzers (unten als JSON). Nutze sie, um konkret zu antworten, nicht generisch.
+
+Wenn der Nutzer eine Änderung an seinen Zielen oder Aufgaben will (anlegen, umbenennen, Priorität, Deadline, Fortschritt, löschen, Plan erstellen, Tag umplanen), rufe GENAU DAS passende Tool auf. Nutze für goalId/goalIds ausschließlich echte id-Werte aus dem Kontext unten — erfinde niemals eigene IDs. Wenn sich eine Ausnahme wie "außer X" nicht eindeutig einem echten Ziel zuordnen lässt, rufe kein Tool auf und frag stattdessen kurz nach, welches Ziel gemeint ist.
+
+Schreib IMMER auch eine kurze Textantwort (max. 2 Sätze) — auch wenn du ein Tool aufrufst. Der Tool-Aufruf ist nur ein Vorschlag, der Nutzer muss ihn erst antippen, bevor wirklich etwas geändert wird.
+
+Aktuelle Daten des Nutzers:
+${JSON.stringify(ctx)}`;
+}
+
+function synthesizeFallbackContent(name: string): string {
+  switch (name) {
+    case 'create_goal':
+      return 'Soll ich das Ziel so anlegen?';
+    case 'update_goal':
+      return 'Soll ich das so ändern?';
+    case 'set_priority':
+      return 'Priorität so setzen?';
+    case 'delete_goal':
+      return 'Wirklich löschen?';
+    case 'generate_plan':
+      return 'Soll ich dir daraus Aufgaben für heute erstellen?';
+    case 'reschedule_today':
+      return 'Soll ich das für dich verschieben?';
+    default:
+      return 'Soll ich das so machen?';
+  }
+}
+
+function labelFor(name: string, args: Record<string, any>, goals: GoalContext[]): string {
+  const goalTitle = (id: string) => goals.find((g) => g.id === id)?.title ?? 'Ziel';
+  switch (name) {
+    case 'create_goal':
+      return `„${args.title}" anlegen`;
+    case 'update_goal': {
+      if (args.status === 'done') return `„${goalTitle(args.goalId)}" als erledigt markieren`;
+      if (args.title) return `In „${args.title}" umbenennen`;
+      if (args.deadline) return 'Deadline aktualisieren';
+      if (args.progress !== undefined) return `Fortschritt auf ${args.progress}% setzen`;
+      return 'Ziel aktualisieren';
+    }
+    case 'set_priority': {
+      const label = { high: 'Hoch', medium: 'Mittel', low: 'Niedrig' }[args.priority as Priority] ?? args.priority;
+      return `Priorität auf ${label} setzen`;
+    }
+    case 'delete_goal': {
+      const n = (args.goalIds ?? []).length;
+      return `${n} Ziel${n === 1 ? '' : 'e'} löschen`;
+    }
+    case 'generate_plan':
+      return 'Plan für heute erstellen';
+    case 'reschedule_today':
+      return 'Heutige Aufgaben auf morgen verschieben';
+    default:
+      return 'Ausführen';
+  }
+}
+
+type ToolAction = { kind: string; label: string; payload?: Record<string, unknown> };
+
+function toActions(toolCalls: any[] | undefined, goals: GoalContext[]): ToolAction[] | undefined {
+  if (!toolCalls || toolCalls.length === 0) return undefined;
+  const actions: ToolAction[] = [];
+  for (const call of toolCalls) {
+    const name = call.function?.name;
+    if (!name) continue;
+    let args: Record<string, unknown> = {};
+    try {
+      args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
+    } catch {
+      continue;
+    }
+    actions.push({ kind: name, label: labelFor(name, args, goals), payload: args });
+  }
+  return actions.length > 0 ? actions : undefined;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
+
+  const jsonHeaders = { ...CORS_HEADERS, 'Content-Type': 'application/json' };
+
+  try {
+    const groqKey = Deno.env.get('GROQ_API_KEY');
+    if (!groqKey) {
+      return new Response(JSON.stringify({ error: 'GROQ_API_KEY not configured' }), { status: 500, headers: jsonHeaders });
+    }
+
+    const body = (await req.json()) as RequestBody;
+    if (!body?.message || !body?.context) {
+      return new Response(JSON.stringify({ error: 'message and context are required' }), { status: 400, headers: jsonHeaders });
+    }
+
+    const messages = [
+      { role: 'system', content: systemPrompt(body.context) },
+      ...(body.history ?? []).slice(-8),
+      { role: 'user', content: body.message },
+    ];
+
+    const groqRes = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        tools: TOOLS,
+        tool_choice: 'auto',
+        temperature: 0.4,
+        max_tokens: 400,
+      }),
+    });
+
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      return new Response(JSON.stringify({ error: `Groq error: ${errText}` }), { status: 502, headers: jsonHeaders });
+    }
+
+    const data = await groqRes.json();
+    const choice = data.choices?.[0]?.message;
+    const toolCalls = choice?.tool_calls;
+    const actions = toActions(toolCalls, body.context.goals);
+    let content: string = (choice?.content ?? '').trim();
+    if (!content) {
+      content = actions && actions.length > 0 ? synthesizeFallbackContent(String(toolCalls?.[0]?.function?.name)) : 'Sag mir gern mehr dazu.';
+    }
+
+    return new Response(JSON.stringify({ content, actions }), { headers: jsonHeaders });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: jsonHeaders });
+  }
+});

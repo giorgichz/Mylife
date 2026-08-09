@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { useLifeStore } from '../store/useLifeStore';
 import { simulateAiReply, AiContext } from './aiSimulator';
+import { fetchCloudAiReply, CloudChatContext } from './aiCloud';
 import { derivePsycheInsight } from './insights';
 import { AiMessage, AiToolAction, Goal } from '../data/types';
 
@@ -26,6 +27,7 @@ export function useAiAssistant() {
     tasks,
     transactions,
     lifeScore,
+    todayMoodLog,
   } = useLifeStore();
   const [isTyping, setIsTyping] = useState(false);
 
@@ -56,6 +58,38 @@ export function useAiAssistant() {
     };
   }, [lifeScore, drivingLicense, applications, moodLogs, tasks, transactions, goals]);
 
+  // Richer snapshot for the real LLM (ai-chat Edge Function) — includes ids
+  // and full field values so it can ground tool calls in real data instead
+  // of the id-less title list the local matcher gets by.
+  const cloudCtx: CloudChatContext = useMemo(
+    () => ({
+      goals: goals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        areaKey: g.areaKey,
+        status: g.status,
+        priority: g.priority,
+        progress: g.progress,
+        deadline: g.deadline,
+      })),
+      tasks: tasks
+        .filter((t) => !t.done)
+        .slice(0, 30)
+        .map((t) => ({ id: t.id, title: t.title, done: t.done, dueDate: t.dueDate, goalId: t.goalId })),
+      overallScore: ctx.overallScore,
+      areaScores: ctx.areaScores,
+      moodToday: (() => {
+        const log = todayMoodLog();
+        return log.mood === 0 ? null : { mood: log.mood, energy: log.energy, motivation: log.motivation, stress: log.stress, sleep: log.sleep };
+      })(),
+      applicationsOpen: ctx.applicationsOpen,
+      theoryProgressPct: ctx.theoryProgressPct,
+      examDaysLeft: ctx.examDaysLeft,
+      savingsRate: ctx.savingsRate,
+    }),
+    [goals, tasks, ctx, todayMoodLog]
+  );
+
   const sendMessage = (text: string, onSettled?: () => void) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -69,8 +103,11 @@ export function useAiAssistant() {
     setIsTyping(true);
     onSettled?.();
 
-    setTimeout(() => {
-      const reply = simulateAiReply(trimmed, ctx);
+    const history = aiMessages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+
+    (async () => {
+      const cloudReply = await fetchCloudAiReply(trimmed, history, cloudCtx);
+      const reply = cloudReply ?? simulateAiReply(trimmed, ctx);
       addAiMessage({
         id: `a-${Date.now()}`,
         role: 'assistant',
@@ -80,7 +117,7 @@ export function useAiAssistant() {
       });
       setIsTyping(false);
       onSettled?.();
-    }, 900);
+    })();
   };
 
   const applyAction = (action: AiToolAction) => {
