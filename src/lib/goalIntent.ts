@@ -123,6 +123,48 @@ export function parseCompletionIntent(input: string, goals: GoalMatch[]): GoalMa
   return undefined;
 }
 
+export type BulkDeleteIntent = {
+  toDelete: GoalMatch[];
+  exceptions: GoalMatch[];
+  unresolvedExceptions: string[];
+};
+
+const BULK_DELETE_PATTERN = /^(?:lösche|entferne|streiche)\s+(?:alle\s+)?(?:meine\s+)?ziele\b(?:\s+außer\s+(.+?))?[.!]?$/i;
+
+/**
+ * Detects "lösche (alle) (meine) Ziele (außer X, Y)" — a bulk operation the
+ * single-goal patterns above can't express, since they always resolve one
+ * fragment to one goal. Exceptions that don't match any real goal are
+ * reported back instead of silently guessed, so nothing gets deleted by
+ * accident.
+ */
+export function parseBulkDeleteIntent(input: string, goals: GoalMatch[]): BulkDeleteIntent | undefined {
+  const trimmed = input.trim();
+  const m = trimmed.match(BULK_DELETE_PATTERN);
+  if (!m || goals.length === 0) return undefined;
+
+  const exceptionsRaw = m[1];
+  if (!exceptionsRaw) {
+    return { toDelete: goals, exceptions: [], unresolvedExceptions: [] };
+  }
+
+  const fragments = exceptionsRaw
+    .split(/\s*(?:,|und|sowie)\s*/i)
+    .map((f) => f.trim())
+    .filter(Boolean);
+
+  const exceptions: GoalMatch[] = [];
+  const unresolvedExceptions: string[] = [];
+  for (const frag of fragments) {
+    const goal = findGoalByFragment(frag, goals);
+    if (goal) exceptions.push(goal);
+    else unresolvedExceptions.push(frag);
+  }
+
+  const toDelete = goals.filter((g) => !exceptions.some((e) => e.id === g.id));
+  return { toDelete, exceptions, unresolvedExceptions };
+}
+
 export type GoalEditIntent =
   | { kind: 'delete'; goal: GoalMatch }
   | { kind: 'priority'; goal: GoalMatch; priority: Priority }

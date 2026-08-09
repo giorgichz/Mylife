@@ -116,6 +116,7 @@ export type AiToolAction = {
     areaKey?: AreaKey;
     deadline?: string;
     goalId?: string;
+    goalIds?: string[];
     status?: GoalStatus;
     priority?: Priority;
     progress?: number;

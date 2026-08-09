@@ -126,10 +126,16 @@ export function useAiAssistant() {
       updateGoal(action.payload.goalId, { priority: action.payload.priority });
       const label = { high: 'Hoch', medium: 'Mittel', low: 'Niedrig' }[action.payload.priority];
       confirmation = targetGoal ? `✅ Priorität von „${targetGoal.title}" ist jetzt ${label}.` : '✅ Erledigt.';
-    } else if (action.kind === 'delete_goal' && action.payload?.goalId) {
-      const targetGoal = goals.find((g) => g.id === action.payload?.goalId);
-      deleteGoal(action.payload.goalId);
-      confirmation = targetGoal ? `✅ „${targetGoal.title}" wurde gelöscht.` : '✅ Gelöscht.';
+    } else if (action.kind === 'delete_goal' && (action.payload?.goalId || action.payload?.goalIds?.length)) {
+      const ids = action.payload.goalIds ?? (action.payload.goalId ? [action.payload.goalId] : []);
+      const titles = ids.map((id) => goals.find((g) => g.id === id)?.title).filter((t): t is string => !!t);
+      ids.forEach((id) => deleteGoal(id));
+      confirmation =
+        titles.length === 0
+          ? '✅ Gelöscht.'
+          : titles.length === 1
+            ? `✅ „${titles[0]}" wurde gelöscht.`
+            : `✅ ${titles.length} Ziele wurden gelöscht: „${titles.join('", „')}".`;
     } else if (action.kind === 'reschedule_today') {
       const today = new Date().toDateString();
       const todayOpenTasks = tasks.filter((t) => !t.done && (!t.dueDate || new Date(t.dueDate).toDateString() === today));

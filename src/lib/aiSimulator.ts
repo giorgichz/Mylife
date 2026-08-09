@@ -1,5 +1,12 @@
 import { AiToolAction } from '../data/types';
-import { parseGoalIntent, parseCompletionIntent, parseEditIntent, buildGoalDraft, GoalMatch } from './goalIntent';
+import {
+  parseGoalIntent,
+  parseCompletionIntent,
+  parseEditIntent,
+  parseBulkDeleteIntent,
+  buildGoalDraft,
+  GoalMatch,
+} from './goalIntent';
 
 /**
  * Local stand-in for the real Claude tool-use flow (see ARCHITECTURE.md §4).
@@ -100,6 +107,31 @@ export function simulateAiReply(input: string, ctx: AiContext): AiReply {
     }
     return {
       content: `Alles klar, kein Stress — für heute stehen sowieso keine Aufgaben mehr offen.`,
+    };
+  }
+
+  const bulkDelete = parseBulkDeleteIntent(input, ctx.activeGoals);
+  if (bulkDelete) {
+    if (bulkDelete.unresolvedExceptions.length > 0) {
+      const list = ctx.activeGoals.map((g) => `„${g.title}"`).join(', ');
+      return {
+        content: `„${bulkDelete.unresolvedExceptions.join('", „')}" konnte ich keinem deiner Ziele zuordnen, deshalb hab ich noch nichts gelöscht. Deine aktuellen Ziele: ${list}. Sag mir genau, welche davon bleiben sollen, dann lösche ich den Rest.`,
+      };
+    }
+    if (bulkDelete.toDelete.length === 0) {
+      return { content: 'Dann bliebe kein Ziel zum Löschen übrig — soll wirklich alles weg?' };
+    }
+    const titles = bulkDelete.toDelete.map((g) => g.title);
+    const keptNote = bulkDelete.exceptions.length > 0 ? ` „${bulkDelete.exceptions.map((g) => g.title).join('", „')}" bleibt erhalten.` : '';
+    return {
+      content: `${titles.length} Ziel${titles.length > 1 ? 'e' : ''} löschen: „${titles.join('", „')}"?${keptNote}`,
+      actions: [
+        {
+          kind: 'delete_goal',
+          label: `${titles.length} Ziel${titles.length > 1 ? 'e' : ''} löschen`,
+          payload: { goalIds: bulkDelete.toDelete.map((g) => g.id) },
+        },
+      ],
     };
   }
 
