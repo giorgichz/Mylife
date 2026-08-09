@@ -45,7 +45,11 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "lang": "de",
+      "themeColor": "#060608",
+      "backgroundColor": "#060608",
+      "description": "Persönlicher KI-Lebensassistent"
     }
   }
 }

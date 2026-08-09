@@ -1,0 +1,13 @@
+{
+  "name": "Mylife",
+  "short_name": "Mylife",
+  "description": "Persönlicher KI-Lebensassistent",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060608",
+  "theme_color": "#060608",
+  "icons": [
+    { "src": "/icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
+    { "src": "/icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "maskable" }
+  ]
+}
