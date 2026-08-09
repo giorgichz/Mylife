@@ -1,4 +1,4 @@
-import { AreaKey } from '../data/types';
+import { AreaKey, Priority } from '../data/types';
 
 const MONTHS: Record<string, number> = {
   januar: 0,
@@ -41,15 +41,18 @@ function guessArea(text: string): AreaKey {
   return 'ausbildung';
 }
 
-function guessDeadline(text: string): string | undefined {
-  const monthMatch = text.match(/bis\s+(?:ende\s+)?([a-zäöü]+)/i);
-  if (!monthMatch) return undefined;
-  const monthIndex = MONTHS[monthMatch[1].toLowerCase()];
+function monthNameToDeadline(monthWord: string): string | undefined {
+  const monthIndex = MONTHS[monthWord.toLowerCase()];
   if (monthIndex === undefined) return undefined;
   const now = new Date();
   let year = now.getFullYear();
   if (monthIndex < now.getMonth()) year += 1;
   return new Date(year, monthIndex + 1, 0).toISOString(); // last day of that month
+}
+
+function guessDeadline(text: string): string | undefined {
+  const monthMatch = text.match(/bis\s+(?:ende\s+)?([a-zäöü]+)/i);
+  return monthMatch ? monthNameToDeadline(monthMatch[1]) : undefined;
 }
 
 /** Turns raw free text (already stripped of any lead-in phrase) into a goal draft. */
@@ -75,6 +78,31 @@ export function parseGoalIntent(input: string): ParsedGoalIntent | undefined {
   return buildGoalDraft(title);
 }
 
+export type GoalMatch = { id: string; title: string };
+
+/** Fuzzy-matches a text fragment (e.g. "Klavier lernen", "dem Führerschein") against real goal titles. */
+export function findGoalByFragment(fragment: string, goals: GoalMatch[]): GoalMatch | undefined {
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[.,!?]/g, '')
+      .replace(/^(dem|den|das|die|der|mein|meinem|meinen)\s+/i, '')
+      .trim();
+  const cleanFragment = normalize(fragment);
+  const fragmentWords = cleanFragment.split(/\s+/).filter((w) => w.length > 2);
+  if (fragmentWords.length === 0) return undefined;
+
+  let best: { goal: GoalMatch; score: number } | undefined;
+  for (const goal of goals) {
+    const title = normalize(goal.title);
+    if (title.includes(cleanFragment) || cleanFragment.includes(title)) return goal;
+    const overlap = fragmentWords.filter((w) => title.includes(w)).length;
+    if (overlap > 0 && (!best || overlap > best.score)) best = { goal, score: overlap };
+  }
+
+  return best && best.score >= Math.max(1, fragmentWords.length - 1) ? best.goal : undefined;
+}
+
 const COMPLETION_PATTERNS = [
   /(?:ich\s+)?(?:hab|habe)\s+(.+?)\s+(?:geschafft|erledigt|abgeschlossen|fertig)/i,
   /markiere\s+(.+?)\s+als\s+erledigt/i,
@@ -82,36 +110,74 @@ const COMPLETION_PATTERNS = [
   /(.+?)\s+ist\s+(?:geschafft|erledigt|fertig|abgeschlossen)/i,
 ];
 
-export type GoalMatch = { id: string; title: string };
-
 /** Detects "ich hab X geschafft" style text and fuzzy-matches it against real goal titles. */
 export function parseCompletionIntent(input: string, goals: GoalMatch[]): GoalMatch | undefined {
   const trimmed = input.trim();
-  let fragment: string | undefined;
-
   for (const pattern of COMPLETION_PATTERNS) {
     const match = trimmed.match(pattern);
-    if (match) {
-      fragment = match[1].trim().toLowerCase();
-      break;
+    if (match && match[1].trim().length >= 3) {
+      const goal = findGoalByFragment(match[1], goals);
+      if (goal) return goal;
     }
   }
-  if (!fragment || fragment.length < 3) return undefined;
+  return undefined;
+}
 
-  const normalize = (s: string) => s.toLowerCase().replace(/[.,!?]/g, '').trim();
-  const fragmentWords = normalize(fragment).split(/\s+/).filter((w) => w.length > 2);
+export type GoalEditIntent =
+  | { kind: 'delete'; goal: GoalMatch }
+  | { kind: 'priority'; goal: GoalMatch; priority: Priority }
+  | { kind: 'deadline'; goal: GoalMatch; deadline: string }
+  | { kind: 'rename'; goal: GoalMatch; title: string }
+  | { kind: 'progress'; goal: GoalMatch; progress: number };
 
-  let best: { goal: GoalMatch; score: number } | undefined;
-  for (const goal of goals) {
-    const title = normalize(goal.title);
-    if (title.includes(normalize(fragment)) || normalize(fragment).includes(title)) {
-      return goal;
-    }
-    const overlap = fragmentWords.filter((w) => title.includes(w)).length;
-    if (overlap > 0 && (!best || overlap > best.score)) {
-      best = { goal, score: overlap };
+/** Detects direct edit commands against an existing goal: delete, priority, deadline, rename, progress. */
+export function parseEditIntent(input: string, goals: GoalMatch[]): GoalEditIntent | undefined {
+  const trimmed = input.trim();
+
+  let m = trimmed.match(/^(?:lösche|entferne|streiche)\s+(?:das\s+ziel\s+)?(.+)/i);
+  if (m) {
+    const goal = findGoalByFragment(m[1], goals);
+    if (goal) return { kind: 'delete', goal };
+  }
+
+  m = trimmed.match(/(?:setze\s+)?(?:die\s+)?priorität\s+(?:von|für)\s+(.+?)\s+auf\s+(hoch|mittel|niedrig)/i);
+  if (!m) m = trimmed.match(/setze\s+(.+?)\s+auf\s+(hohe|hohen|höchste|mittlere|mittleren|niedrige|niedrigen)\s+priorität/i);
+  if (m) {
+    const goal = findGoalByFragment(m[1], goals);
+    const p = m[2].toLowerCase();
+    const priority: Priority = p.startsWith('hoch') || p.startsWith('höch') ? 'high' : p.startsWith('nied') ? 'low' : 'medium';
+    if (goal) return { kind: 'priority', goal, priority };
+  }
+
+  m = trimmed.match(/(.+?)\s+ist\s+(?:jetzt\s+)?(sehr\s+wichtig|wichtig|dringend|unwichtig|nicht\s+so\s+wichtig)/i);
+  if (m) {
+    const goal = findGoalByFragment(m[1], goals);
+    const low = /unwichtig|nicht\s+so\s+wichtig/i.test(m[2]);
+    if (goal) return { kind: 'priority', goal, priority: low ? 'low' : 'high' };
+  }
+
+  m = trimmed.match(/(?:verschiebe|setze)\s+(?:die\s+deadline\s+(?:von|für)\s+)?(.+?)\s+auf\s+(?:ende\s+)?([a-zäöü]+)/i);
+  if (m) {
+    const goal = findGoalByFragment(m[1], goals);
+    const deadline = monthNameToDeadline(m[2]);
+    if (goal && deadline) return { kind: 'deadline', goal, deadline };
+  }
+
+  m = trimmed.match(/(?:änd(?:e)?re|benenne|nenne)\s+(.+?)\s+(?:um\s+)?in\s+(.+)/i);
+  if (m && m[2].trim().length >= 3) {
+    const goal = findGoalByFragment(m[1], goals);
+    if (goal) return { kind: 'rename', goal, title: m[2].trim() };
+  }
+
+  m = trimmed.match(/setze\s+(?:den\s+)?fortschritt\s+(?:von|für)\s+(.+?)\s+auf\s+(\d{1,3})\s*%/i);
+  if (!m) m = trimmed.match(/(.+?)\s+ist\s+(?:zu\s+)?(\d{1,3})\s*%\s*(?:fertig|geschafft|erledigt)?/i);
+  if (m) {
+    const pct = Number(m[2]);
+    if (pct >= 0 && pct <= 100) {
+      const goal = findGoalByFragment(m[1], goals);
+      if (goal) return { kind: 'progress', goal, progress: pct };
     }
   }
 
-  return best && best.score >= Math.max(1, fragmentWords.length - 1) ? best.goal : undefined;
+  return undefined;
 }

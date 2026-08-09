@@ -1,5 +1,5 @@
 import { AiToolAction } from '../data/types';
-import { parseGoalIntent, parseCompletionIntent, buildGoalDraft, GoalMatch } from './goalIntent';
+import { parseGoalIntent, parseCompletionIntent, parseEditIntent, buildGoalDraft, GoalMatch } from './goalIntent';
 
 /**
  * Local stand-in for the real Claude tool-use flow (see ARCHITECTURE.md §4).
@@ -101,6 +101,65 @@ export function simulateAiReply(input: string, ctx: AiContext): AiReply {
     return {
       content: `Alles klar, kein Stress — für heute stehen sowieso keine Aufgaben mehr offen.`,
     };
+  }
+
+  const editIntent = parseEditIntent(input, ctx.activeGoals);
+  if (editIntent) {
+    switch (editIntent.kind) {
+      case 'delete':
+        return {
+          content: `„${editIntent.goal.title}" löschen — sicher?`,
+          actions: [
+            { kind: 'delete_goal', label: `„${editIntent.goal.title}" löschen`, payload: { goalId: editIntent.goal.id } },
+          ],
+        };
+      case 'priority': {
+        const label = { high: 'Hoch', medium: 'Mittel', low: 'Niedrig' }[editIntent.priority];
+        return {
+          content: `Priorität von „${editIntent.goal.title}" auf ${label} setzen?`,
+          actions: [
+            {
+              kind: 'set_priority',
+              label: `Priorität auf ${label} setzen`,
+              payload: { goalId: editIntent.goal.id, priority: editIntent.priority },
+            },
+          ],
+        };
+      }
+      case 'deadline':
+        return {
+          content: `Deadline von „${editIntent.goal.title}" auf ${new Date(editIntent.deadline).toLocaleDateString('de-DE')} setzen?`,
+          actions: [
+            {
+              kind: 'update_goal',
+              label: 'Deadline aktualisieren',
+              payload: { goalId: editIntent.goal.id, deadline: editIntent.deadline },
+            },
+          ],
+        };
+      case 'rename':
+        return {
+          content: `„${editIntent.goal.title}" in „${editIntent.title}" umbenennen?`,
+          actions: [
+            {
+              kind: 'update_goal',
+              label: `In „${editIntent.title}" umbenennen`,
+              payload: { goalId: editIntent.goal.id, title: editIntent.title },
+            },
+          ],
+        };
+      case 'progress':
+        return {
+          content: `Fortschritt von „${editIntent.goal.title}" auf ${editIntent.progress}% setzen?`,
+          actions: [
+            {
+              kind: 'update_goal',
+              label: `Fortschritt auf ${editIntent.progress}% setzen`,
+              payload: { goalId: editIntent.goal.id, progress: editIntent.progress },
+            },
+          ],
+        };
+    }
   }
 
   const completedGoal = parseCompletionIntent(input, ctx.activeGoals);

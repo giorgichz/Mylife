@@ -117,6 +117,8 @@ export type AiToolAction = {
     deadline?: string;
     goalId?: string;
     status?: GoalStatus;
+    priority?: Priority;
+    progress?: number;
   };
 };
 

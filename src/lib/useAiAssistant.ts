@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useLifeStore } from '../store/useLifeStore';
 import { simulateAiReply, AiContext } from './aiSimulator';
 import { derivePsycheInsight } from './insights';
-import { AiMessage, AiToolAction } from '../data/types';
+import { AiMessage, AiToolAction, Goal } from '../data/types';
 
 /**
  * Single shared engine behind every entry point that talks to the "KI"
@@ -18,6 +18,7 @@ export function useAiAssistant() {
     updateTask,
     addGoal,
     updateGoal,
+    deleteGoal,
     goals,
     moodLogs,
     applications,
@@ -98,15 +99,37 @@ export function useAiAssistant() {
     } else if (action.kind === 'create_goal') {
       router.push('/goal/new');
       return;
-    } else if (action.kind === 'update_goal' && action.payload?.goalId && action.payload.status) {
+    } else if (action.kind === 'update_goal' && action.payload?.goalId) {
       const targetGoal = goals.find((g) => g.id === action.payload?.goalId);
-      updateGoal(
-        action.payload.goalId,
-        action.payload.status === 'done' ? { status: 'done', progress: 100 } : { status: action.payload.status }
-      );
-      confirmation = targetGoal
-        ? `✅ „${targetGoal.title}" ist jetzt als erledigt markiert. Gut gemacht!`
-        : '✅ Erledigt.';
+      const { status, deadline, title, progress } = action.payload;
+      const fields: Partial<Omit<Goal, 'id' | 'createdAt'>> = {};
+      if (status) {
+        fields.status = status;
+        if (status === 'done') fields.progress = 100;
+      }
+      if (deadline !== undefined) fields.deadline = deadline;
+      if (title !== undefined) fields.title = title;
+      if (progress !== undefined) fields.progress = progress;
+      updateGoal(action.payload.goalId, fields);
+
+      if (status === 'done') {
+        confirmation = targetGoal ? `✅ „${targetGoal.title}" ist jetzt als erledigt markiert. Gut gemacht!` : '✅ Erledigt.';
+      } else if (title !== undefined) {
+        confirmation = `✅ Ziel umbenannt in „${title}".`;
+      } else if (deadline !== undefined) {
+        confirmation = targetGoal ? `✅ Deadline von „${targetGoal.title}" aktualisiert.` : '✅ Erledigt.';
+      } else if (progress !== undefined) {
+        confirmation = targetGoal ? `✅ Fortschritt von „${targetGoal.title}" auf ${progress}% gesetzt.` : '✅ Erledigt.';
+      }
+    } else if (action.kind === 'set_priority' && action.payload?.goalId && action.payload.priority) {
+      const targetGoal = goals.find((g) => g.id === action.payload?.goalId);
+      updateGoal(action.payload.goalId, { priority: action.payload.priority });
+      const label = { high: 'Hoch', medium: 'Mittel', low: 'Niedrig' }[action.payload.priority];
+      confirmation = targetGoal ? `✅ Priorität von „${targetGoal.title}" ist jetzt ${label}.` : '✅ Erledigt.';
+    } else if (action.kind === 'delete_goal' && action.payload?.goalId) {
+      const targetGoal = goals.find((g) => g.id === action.payload?.goalId);
+      deleteGoal(action.payload.goalId);
+      confirmation = targetGoal ? `✅ „${targetGoal.title}" wurde gelöscht.` : '✅ Gelöscht.';
     } else if (action.kind === 'reschedule_today') {
       const today = new Date().toDateString();
       const todayOpenTasks = tasks.filter((t) => !t.done && (!t.dueDate || new Date(t.dueDate).toDateString() === today));
