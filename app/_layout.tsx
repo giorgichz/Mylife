@@ -7,11 +7,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../src/theme';
 import { AuthProvider, useAuth } from '../src/lib/AuthProvider';
+import { useCloudSync } from '../src/lib/useCloudSync';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AppShell() {
   const { ready } = useAuth();
+  useCloudSync();
 
   useEffect(() => {
     // Don't block the app on the network — hide once auth resolves,

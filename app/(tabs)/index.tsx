@@ -9,6 +9,8 @@ import { AnimatedPressable } from '../../src/components/ui/AnimatedPressable';
 import { AreaScoreRow } from '../../src/components/domain/AreaScoreRow';
 import { GoalCard } from '../../src/components/domain/GoalCard';
 import { TaskRow } from '../../src/components/domain/TaskRow';
+import { CosmicBackdrop } from '../../src/components/domain/CosmicBackdrop';
+import { QuickCapture } from '../../src/components/domain/QuickCapture';
 import { colors, spacing, type } from '../../src/theme';
 import { timeBasedGreeting, formatShortDate, formatTime } from '../../src/lib/greeting';
 import { AREA_ICONS, AreaKey } from '../../src/data/types';
@@ -37,6 +39,7 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer>
+      <CosmicBackdrop height={520} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -52,12 +55,19 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.section}>
+          <QuickCapture />
+        </View>
+
+        <View style={styles.section}>
           <GlassCard size="hero">
             <View style={styles.heroTop}>
-              <ProgressRing value={score.overall} size={104} strokeWidth={11}>
-                <Text style={styles.scoreNumber}>{score.overall}</Text>
-                <Text style={styles.scoreCaption}>Life Score</Text>
-              </ProgressRing>
+              <View style={styles.ringGlowWrap}>
+                <View style={[styles.ringGlow, { shadowColor: colors.accent }]} />
+                <ProgressRing value={score.overall} size={104} strokeWidth={11}>
+                  <Text style={styles.scoreNumber}>{score.overall}</Text>
+                  <Text style={styles.scoreCaption}>Life Score</Text>
+                </ProgressRing>
+              </View>
               <View style={styles.heroBreakdown}>
                 {AREA_ORDER.map((area) => (
                   <AreaScoreRow key={area} area={area} score={score[area]} />
@@ -213,6 +223,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xl,
+  },
+  ringGlowWrap: {
+    width: 104,
+    height: 104,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringGlow: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: colors.accent,
+    opacity: 0.35,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 10,
   },
   scoreNumber: {
     ...type.numeric,

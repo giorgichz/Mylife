@@ -101,7 +101,14 @@ export type LifeScoreBreakdown = Record<AreaKey, number> & { overall: number };
 export type ChatRole = 'user' | 'assistant';
 
 export type AiToolAction = {
-  kind: 'create_goal' | 'update_goal' | 'delete_goal' | 'create_subgoal' | 'set_priority' | 'generate_plan';
+  kind:
+    | 'create_goal'
+    | 'update_goal'
+    | 'delete_goal'
+    | 'create_subgoal'
+    | 'set_priority'
+    | 'generate_plan'
+    | 'reschedule_today';
   label: string;
   /** Parsed data the action applies when tapped, e.g. a goal title guessed from free text. */
   payload?: {

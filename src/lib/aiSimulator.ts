@@ -19,8 +19,12 @@ export type AiContext = {
   savingsRate: number;
   psycheInsightText: string;
   openTaskCount: number;
+  todayOpenTaskCount: number;
   activeGoals: GoalMatch[];
 };
+
+const DISRUPTION_PATTERN =
+  /(arbeite.*länger|länger arbeiten|keine zeit (heute|mehr)|wenig zeit heute|schaffe (es )?(heute )?nicht|bin (heute )?(müde|erschöpft|kaputt)|viel los heute|muss heute früher|hab heute keine kraft|zu (viel|müde) für heute)/i;
 
 export type AiReply = {
   content: string;
@@ -87,6 +91,18 @@ const rules: { test: RegExp; reply: (ctx: AiContext) => AiReply }[] = [
 ];
 
 export function simulateAiReply(input: string, ctx: AiContext): AiReply {
+  if (DISRUPTION_PATTERN.test(input)) {
+    if (ctx.todayOpenTaskCount > 0) {
+      return {
+        content: `Alles klar, dann passen wir den Tag an. Du hast noch ${ctx.todayOpenTaskCount} offene Aufgabe${ctx.todayOpenTaskCount > 1 ? 'n' : ''} für heute — soll ich die auf morgen verschieben?`,
+        actions: [{ kind: 'reschedule_today', label: 'Heutige Aufgaben auf morgen verschieben' }],
+      };
+    }
+    return {
+      content: `Alles klar, kein Stress — für heute stehen sowieso keine Aufgaben mehr offen.`,
+    };
+  }
+
   const completedGoal = parseCompletionIntent(input, ctx.activeGoals);
   if (completedGoal) {
     return {

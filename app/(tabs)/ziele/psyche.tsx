@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLifeStore } from '../../../src/store/useLifeStore';
 import { ScreenContainer, GlassCard, SectionHeader } from '../../../src/components/ui';
 import { DomainHeader } from '../../../src/components/domain/DomainHeader';
-import { MoodMetricRow } from '../../../src/components/domain/MoodMetricRow';
+import { MoodFaceSelector } from '../../../src/components/domain/MoodFaceSelector';
+import { MoodMeterRow } from '../../../src/components/domain/MoodMeterRow';
 import { MiniBarChart } from '../../../src/components/domain/MiniBarChart';
 import { derivePsycheInsight } from '../../../src/lib/insights';
 import { colors, spacing, type } from '../../../src/theme';
@@ -42,15 +43,33 @@ export default function PsycheScreen() {
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Heute eintragen" />
-          <GlassCard style={styles.card}>
-            <MoodMetricRow label="Stimmung" value={today.mood} onChange={(v) => updateTodayMood('mood', v)} color={colors.area.psyche} />
-            <View style={styles.divider} />
-            <MoodMetricRow label="Energie" value={today.energy} onChange={(v) => updateTodayMood('energy', v)} color={colors.area.psyche} />
-            <View style={styles.divider} />
-            <MoodMetricRow label="Motivation" value={today.motivation} onChange={(v) => updateTodayMood('motivation', v)} color={colors.area.psyche} />
-            <View style={styles.divider} />
-            <MoodMetricRow label="Stress" value={today.stress} onChange={(v) => updateTodayMood('stress', v)} color={colors.warning} />
+          <SectionHeader title="Wie geht's dir heute?" />
+          <GlassCard size="hero" style={styles.checkinCard}>
+            <MoodFaceSelector value={today.mood} onChange={(v) => updateTodayMood('mood', v)} />
+
+            <View style={styles.meterStack}>
+              <MoodMeterRow
+                icon="battery-charging-outline"
+                label="Energie"
+                value={today.energy}
+                onChange={(v) => updateTodayMood('energy', v)}
+                color={colors.area.psyche}
+              />
+              <MoodMeterRow
+                icon="flame-outline"
+                label="Motivation"
+                value={today.motivation}
+                onChange={(v) => updateTodayMood('motivation', v)}
+                color={colors.area.psyche}
+              />
+              <MoodMeterRow
+                icon="pulse-outline"
+                label="Stress"
+                value={today.stress}
+                onChange={(v) => updateTodayMood('stress', v)}
+                color={colors.warning}
+              />
+            </View>
           </GlassCard>
         </View>
 
@@ -93,6 +112,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenX,
   },
   card: {},
+  checkinCard: {
+    gap: spacing.xl,
+  },
+  meterStack: {
+    gap: spacing.lg,
+  },
   insightCard: {
     flexDirection: 'row',
     gap: spacing.md,
