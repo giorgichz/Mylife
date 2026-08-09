@@ -98,6 +98,14 @@ export type Application = {
 
 export type LifeScoreBreakdown = Record<AreaKey, number> & { overall: number };
 
+/** Quick morning check-in — separate from MoodLog (that's the fuller Psyche picker); this only feeds "how much time/energy do I actually have today" to the AI. */
+export type DailyCheckIn = {
+  id: string;
+  date: string; // ISO date
+  workUntil?: string; // free label, e.g. "18:00" or "Frei heute"
+  note?: string;
+};
+
 export type ChatRole = 'user' | 'assistant';
 
 export type AiToolAction = {

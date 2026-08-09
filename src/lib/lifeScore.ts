@@ -2,9 +2,12 @@ import { AreaKey, DrivingLicenseProgress, Goal, LifeScoreBreakdown, MoodLog, Tas
 
 const clamp = (n: number, min = 0, max = 100) => Math.max(min, Math.min(max, n));
 
+// No goals/logs/budgets yet means "not started", not "halfway there" — every
+// area uses 0 as its no-data baseline so the score is comparable across
+// areas instead of some defaulting to a generous 50/70 "neutral" credit.
 function goalProgressAvg(goals: Goal[], area: AreaKey): number {
   const inArea = goals.filter((g) => g.areaKey === area && g.status !== 'paused');
-  if (inArea.length === 0) return 50;
+  if (inArea.length === 0) return 0;
   return inArea.reduce((sum, g) => sum + g.progress, 0) / inArea.length;
 }
 
@@ -17,7 +20,7 @@ function taskCompletionBonus(tasks: TaskItem[], area: AreaKey): number {
 
 function psycheScore(logs: MoodLog[]): number {
   const recent = logs.slice(-7);
-  if (recent.length === 0) return 50;
+  if (recent.length === 0) return 0;
   const avg = (key: keyof MoodLog) =>
     recent.reduce((sum, l) => sum + (l[key] as number), 0) / recent.length;
 
@@ -43,7 +46,7 @@ function drivingScore(d: DrivingLicenseProgress): number {
 function financeScore(balance: number, budgets: { limit: number; spent: number }[], savingsGoalProgress: number): number {
   const budgetHealth =
     budgets.length === 0
-      ? 70
+      ? 0
       : clamp(100 - (budgets.reduce((s, b) => s + Math.max(0, b.spent - b.limit), 0) / budgets.reduce((s, b) => s + b.limit, 1)) * 100);
   const savings = clamp(savingsGoalProgress);
   const buffer = clamp((balance / 1500) * 100, 0, 100);
@@ -61,7 +64,9 @@ export function computeLifeScore(params: {
   const { goals, tasks, moodLogs, drivingLicense, totalBalance, budgets } = params;
 
   const ausbildung = clamp(goalProgressAvg(goals, 'ausbildung') + taskCompletionBonus(tasks, 'ausbildung'));
-  const psyche = clamp(psycheScore(moodLogs));
+  // Blended like every other area, so a Psyche goal (e.g. "mehr Sport machen")
+  // actually moves the score instead of only mood logs counting.
+  const psyche = clamp(psycheScore(moodLogs) * 0.7 + goalProgressAvg(goals, 'psyche') * 0.3);
   const geld = clamp(financeScore(totalBalance, budgets, goalProgressAvg(goals, 'geld')));
   const fuehrerschein = clamp(drivingScore(drivingLicense) * 0.7 + goalProgressAvg(goals, 'fuehrerschein') * 0.3);
 

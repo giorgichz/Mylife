@@ -12,6 +12,7 @@ import { TaskRow } from '../../src/components/domain/TaskRow';
 import { CosmicBackdrop } from '../../src/components/domain/CosmicBackdrop';
 import { QuickCapture } from '../../src/components/domain/QuickCapture';
 import { WeekStrip, WeekDayInfo } from '../../src/components/domain/WeekStrip';
+import { DailyCheckInCard } from '../../src/components/domain/DailyCheckInCard';
 import { colors, spacing, type } from '../../src/theme';
 import { timeBasedGreeting, formatShortDate, formatTime } from '../../src/lib/greeting';
 import { AREA_ICONS, AreaKey } from '../../src/data/types';
@@ -19,8 +20,9 @@ import { AREA_ICONS, AreaKey } from '../../src/data/types';
 const AREA_ORDER: AreaKey[] = ['ausbildung', 'psyche', 'geld', 'fuehrerschein'];
 
 export default function HomeScreen() {
-  const { user, goals, tasks, appointments, toggleTask, lifeScore } = useLifeStore();
+  const { user, goals, tasks, appointments, toggleTask, lifeScore, todayCheckIn } = useLifeStore();
   const score = lifeScore();
+  const checkInDone = !!todayCheckIn();
 
   const todayTasks = useMemo(() => {
     const today = new Date().toDateString();
@@ -80,6 +82,12 @@ export default function HomeScreen() {
             <Text style={styles.avatarInitial}>{user.firstName.charAt(0)}</Text>
           </AnimatedPressable>
         </View>
+
+        {!checkInDone && (
+          <View style={styles.section}>
+            <DailyCheckInCard style={styles.listCard} />
+          </View>
+        )}
 
         <View style={styles.section}>
           <QuickCapture />

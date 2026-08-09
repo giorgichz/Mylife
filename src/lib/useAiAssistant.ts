@@ -28,6 +28,7 @@ export function useAiAssistant() {
     transactions,
     lifeScore,
     todayMoodLog,
+    todayCheckIn,
   } = useLifeStore();
   const [isTyping, setIsTyping] = useState(false);
 
@@ -86,8 +87,13 @@ export function useAiAssistant() {
       theoryProgressPct: ctx.theoryProgressPct,
       examDaysLeft: ctx.examDaysLeft,
       savingsRate: ctx.savingsRate,
+      todayCheckIn: (() => {
+        const c = todayCheckIn();
+        if (!c || (!c.workUntil && !c.note)) return null;
+        return { workUntil: c.workUntil, note: c.note };
+      })(),
     }),
-    [goals, tasks, ctx, todayMoodLog]
+    [goals, tasks, ctx, todayMoodLog, todayCheckIn]
   );
 
   const sendMessage = (text: string, onSettled?: () => void) => {

@@ -14,7 +14,7 @@ import {
   mockTransactions,
   mockUser,
 } from '../data/mock';
-import { AiMessage, Application, Goal, MoodLog, TaskItem } from '../data/types';
+import { AiMessage, Application, DailyCheckIn, Goal, MoodLog, TaskItem } from '../data/types';
 import { computeLifeScore } from '../lib/lifeScore';
 import { uuidv4, isValidUuid } from '../lib/id';
 import * as sync from '../lib/sync';
@@ -38,6 +38,7 @@ type LifeStore = {
   budgets: typeof mockBudgets;
   drivingLicense: typeof mockDrivingLicense;
   aiMessages: AiMessage[];
+  dailyCheckIns: DailyCheckIn[];
 
   setUserId: (userId: string | null) => void;
   hydrateFromRemote: (data: {
@@ -54,6 +55,7 @@ type LifeStore = {
   addAiMessage: (message: AiMessage) => void;
   updateGoalProgress: (id: string, progress: number) => void;
   updateTodayMood: (field: 'mood' | 'energy' | 'motivation' | 'stress', value: number) => void;
+  submitDailyCheckIn: (fields: { workUntil?: string; note?: string }) => void;
   addTasks: (tasks: Omit<TaskItem, 'id'>[]) => void;
   updateTask: (id: string, fields: Partial<Omit<TaskItem, 'id'>>) => void;
   deleteTask: (id: string) => void;
@@ -67,6 +69,7 @@ type LifeStore = {
 
   lifeScore: () => ReturnType<typeof computeLifeScore>;
   todayMoodLog: () => MoodLog;
+  todayCheckIn: () => DailyCheckIn | undefined;
 };
 
 export const useLifeStore = create<LifeStore>()(
@@ -84,6 +87,7 @@ export const useLifeStore = create<LifeStore>()(
   budgets: mockBudgets,
   drivingLicense: mockDrivingLicense,
   aiMessages: mockAiMessages,
+  dailyCheckIns: [],
 
   setUserId: (userId) => set({ userId }),
 
@@ -270,6 +274,25 @@ export const useLifeStore = create<LifeStore>()(
     return existing ?? { id: 'today', date: new Date().toISOString(), mood: 0, energy: 0, motivation: 0, stress: 0, sleep: 0 };
   },
 
+  submitDailyCheckIn: (fields) => {
+    set((state) => {
+      const today = new Date().toDateString();
+      const existingIndex = state.dailyCheckIns.findIndex((c) => new Date(c.date).toDateString() === today);
+      if (existingIndex === -1) {
+        const newCheckIn: DailyCheckIn = { id: uuidv4(), date: new Date().toISOString(), ...fields };
+        return { dailyCheckIns: [...state.dailyCheckIns, newCheckIn] };
+      }
+      return {
+        dailyCheckIns: state.dailyCheckIns.map((c, i) => (i === existingIndex ? { ...c, ...fields } : c)),
+      };
+    });
+  },
+
+  todayCheckIn: () => {
+    const today = new Date().toDateString();
+    return get().dailyCheckIns.find((c) => new Date(c.date).toDateString() === today);
+  },
+
   lifeScore: () => {
     const state = get();
     const totalBalance = state.accounts.reduce((sum, a) => sum + a.balance, 0);
@@ -298,6 +321,7 @@ export const useLifeStore = create<LifeStore>()(
         budgets: state.budgets,
         drivingLicense: state.drivingLicense,
         aiMessages: state.aiMessages,
+        dailyCheckIns: state.dailyCheckIns,
       }),
     }
   )

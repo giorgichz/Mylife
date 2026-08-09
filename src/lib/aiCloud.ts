@@ -19,6 +19,7 @@ export type CloudChatContext = {
   theoryProgressPct: number;
   examDaysLeft: number | null;
   savingsRate: number;
+  todayCheckIn: { workUntil?: string; note?: string } | null;
 };
 
 // On web this stays empty so the fetch is same-origin ("/api/ai-chat"),
