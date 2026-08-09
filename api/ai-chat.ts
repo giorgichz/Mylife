@@ -133,7 +133,7 @@ Du kennst die aktuellen Daten des Nutzers (unten als JSON). Nutze sie, um konkre
 
 Wenn der Nutzer eine Änderung an seinen Zielen oder Aufgaben will (anlegen, umbenennen, Priorität, Deadline, Fortschritt, löschen, Plan erstellen, Tag umplanen), rufe GENAU DAS passende Tool auf. Nutze für goalId/goalIds ausschließlich echte id-Werte aus dem Kontext unten — erfinde niemals eigene IDs. Wenn sich eine Ausnahme wie "außer X" nicht eindeutig einem echten Ziel zuordnen lässt, rufe kein Tool auf und frag stattdessen kurz nach, welches Ziel gemeint ist.
 
-Schreib IMMER auch eine kurze Textantwort (max. 2 Sätze) — auch wenn du ein Tool aufrufst. Der Tool-Aufruf ist nur ein Vorschlag, der Nutzer muss ihn erst antippen, bevor wirklich etwas geändert wird.
+Schreib IMMER auch eine kurze Textantwort (max. 2 Sätze) — auch wenn du ein Tool aufrufst. Der Tool-Aufruf ist nur ein Vorschlag, der Nutzer muss ihn erst antippen, bevor wirklich etwas geändert wird. Rufe Tools ausschließlich über die bereitgestellte Tool-Calling-Funktion auf — schreib niemals Text wie "<function=...>" in deine Antwort, das wird nicht ausgeführt.
 
 Aktuelle Daten des Nutzers:
 ${JSON.stringify(ctx)}`;
@@ -206,6 +206,40 @@ function toActions(toolCalls: any[] | undefined, goals: GoalContext[]): ToolActi
   return actions.length > 0 ? actions : undefined;
 }
 
+// Groq's Llama models sometimes ignore the structured tool-calling API and
+// instead write a text pseudo-call like "<function=generate_plan></function>"
+// straight into the message content — a leftover of Llama's own trained
+// text format. When that happens `tool_calls` is empty and the content
+// looks like a real answer, so the model confidently claims it did
+// something it never actually did. This parses that fallback format too.
+const INLINE_FUNCTION_TAG = /<function=([a-zA-Z_]\w*)>([\s\S]*?)<\/function>/g;
+
+function parseInlineFunctionTags(
+  content: string,
+  goals: GoalContext[]
+): { actions: ToolAction[]; cleanedContent: string } | undefined {
+  const actions: ToolAction[] = [];
+  let match: RegExpExecArray | null;
+  INLINE_FUNCTION_TAG.lastIndex = 0;
+  while ((match = INLINE_FUNCTION_TAG.exec(content)) !== null) {
+    const name = match[1];
+    const argsText = match[2].trim();
+    let args: Record<string, unknown> = {};
+    if (argsText) {
+      try {
+        args = JSON.parse(argsText);
+      } catch {
+        // malformed inline args — skip this one call, keep the rest
+        continue;
+      }
+    }
+    actions.push({ kind: name, label: labelFor(name, args, goals), payload: args });
+  }
+  if (actions.length === 0) return undefined;
+  const cleanedContent = content.replace(INLINE_FUNCTION_TAG, '').replace(/\s{2,}/g, ' ').trim();
+  return { actions, cleanedContent };
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'content-type');
@@ -261,10 +295,21 @@ export default async function handler(req: any, res: any) {
     const data = await groqRes.json();
     const choice = data.choices?.[0]?.message;
     const toolCalls = choice?.tool_calls;
-    const actions = toActions(toolCalls, body.context.goals);
+    let actions = toActions(toolCalls, body.context.goals);
     let content: string = (choice?.content ?? '').trim();
+    let firstToolName: string | undefined = toolCalls?.[0]?.function?.name;
+
+    if (!actions && content) {
+      const inline = parseInlineFunctionTags(content, body.context.goals);
+      if (inline) {
+        actions = inline.actions;
+        content = inline.cleanedContent;
+        firstToolName = inline.actions[0]?.kind;
+      }
+    }
+
     if (!content) {
-      content = actions && actions.length > 0 ? synthesizeFallbackContent(String(toolCalls?.[0]?.function?.name)) : 'Sag mir gern mehr dazu.';
+      content = actions && actions.length > 0 ? synthesizeFallbackContent(String(firstToolName)) : 'Sag mir gern mehr dazu.';
     }
 
     res.status(200).json({ content, actions });

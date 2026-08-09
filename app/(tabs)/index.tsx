@@ -11,6 +11,7 @@ import { GoalCard } from '../../src/components/domain/GoalCard';
 import { TaskRow } from '../../src/components/domain/TaskRow';
 import { CosmicBackdrop } from '../../src/components/domain/CosmicBackdrop';
 import { QuickCapture } from '../../src/components/domain/QuickCapture';
+import { WeekStrip, WeekDayInfo } from '../../src/components/domain/WeekStrip';
 import { colors, spacing, type } from '../../src/theme';
 import { timeBasedGreeting, formatShortDate, formatTime } from '../../src/lib/greeting';
 import { AREA_ICONS, AreaKey } from '../../src/data/types';
@@ -23,8 +24,34 @@ export default function HomeScreen() {
 
   const todayTasks = useMemo(() => {
     const today = new Date().toDateString();
-    return tasks.filter((t) => !t.dueDate || new Date(t.dueDate).toDateString() === today);
+    return tasks
+      .filter((t) => !t.dueDate || new Date(t.dueDate).toDateString() === today)
+      // Open tasks first so the list doesn't get cluttered with things
+      // that are already done — done items sink to the bottom instead.
+      .sort((a, b) => Number(a.done) - Number(b.done));
   }, [tasks]);
+
+  const weekDays: WeekDayInfo[] = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      const dayKey = day.toDateString();
+      const openCount = tasks.filter((t) => {
+        if (t.done) return false;
+        if (t.dueDate) return new Date(t.dueDate).toDateString() === dayKey;
+        return i === 0;
+      }).length;
+      const hasDeadline = goals.some((g) => g.status === 'active' && g.deadline && new Date(g.deadline).toDateString() === dayKey);
+      return {
+        label: day.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', ''),
+        isToday: i === 0,
+        openCount,
+        hasDeadline,
+      };
+    });
+  }, [tasks, goals]);
 
   const topGoals = useMemo(() => {
     const priorityWeight = { high: 0, medium: 1, low: 2 } as const;
@@ -117,6 +144,10 @@ export default function HomeScreen() {
               <Text style={styles.addTaskText}>Aufgabe hinzufügen</Text>
             </AnimatedPressable>
           </GlassCard>
+        </View>
+
+        <View style={styles.section}>
+          <WeekStrip days={weekDays} />
         </View>
 
         <View style={styles.section}>
