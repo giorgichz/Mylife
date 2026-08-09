@@ -1,17 +1,12 @@
-// Free-tier LLM bridge for the Mylife KI-Assistent (Groq, OpenAI-compatible
-// tool calling). Runs server-side so the Groq API key never reaches the
-// client bundle. This function never writes to the database itself — it
-// only proposes AiToolAction objects that the app applies locally after the
-// user taps to confirm, same pattern the local heuristic matcher already
-// used, so a bad model turn can never silently mutate data.
+// Vercel Serverless Function — free-tier LLM bridge for the Mylife
+// KI-Assistent (Groq, OpenAI-compatible tool calling). Runs server-side so
+// the Groq API key (set as a Vercel Environment Variable, never committed)
+// stays out of the client bundle. This function never writes to the
+// database itself — it only proposes actions the app applies locally after
+// the user taps to confirm, same pattern the local heuristic matcher uses.
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.3-70b-versatile';
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 type AreaKey = 'ausbildung' | 'psyche' | 'geld' | 'fuehrerschein';
 type Priority = 'low' | 'medium' | 'high';
@@ -211,24 +206,33 @@ function toActions(toolCalls: any[] | undefined, goals: GoalContext[]): ToolActi
   return actions.length > 0 ? actions : undefined;
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'content-type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS });
+    res.status(200).end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
-  const jsonHeaders = { ...CORS_HEADERS, 'Content-Type': 'application/json' };
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) {
+    res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+    return;
+  }
+
+  const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as RequestBody;
+  if (!body?.message || !body?.context) {
+    res.status(400).json({ error: 'message and context are required' });
+    return;
+  }
 
   try {
-    const groqKey = Deno.env.get('GROQ_API_KEY');
-    if (!groqKey) {
-      return new Response(JSON.stringify({ error: 'GROQ_API_KEY not configured' }), { status: 500, headers: jsonHeaders });
-    }
-
-    const body = (await req.json()) as RequestBody;
-    if (!body?.message || !body?.context) {
-      return new Response(JSON.stringify({ error: 'message and context are required' }), { status: 400, headers: jsonHeaders });
-    }
-
     const messages = [
       { role: 'system', content: systemPrompt(body.context) },
       ...(body.history ?? []).slice(-8),
@@ -250,7 +254,8 @@ Deno.serve(async (req) => {
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
-      return new Response(JSON.stringify({ error: `Groq error: ${errText}` }), { status: 502, headers: jsonHeaders });
+      res.status(502).json({ error: `Groq error: ${errText}` });
+      return;
     }
 
     const data = await groqRes.json();
@@ -262,8 +267,8 @@ Deno.serve(async (req) => {
       content = actions && actions.length > 0 ? synthesizeFallbackContent(String(toolCalls?.[0]?.function?.name)) : 'Sag mir gern mehr dazu.';
     }
 
-    return new Response(JSON.stringify({ content, actions }), { headers: jsonHeaders });
+    res.status(200).json({ content, actions });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: jsonHeaders });
+    res.status(500).json({ error: String(err) });
   }
-});
+}
