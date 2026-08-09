@@ -1,5 +1,5 @@
 import { AiToolAction } from '../data/types';
-import { parseGoalIntent, parseCompletionIntent, GoalMatch } from './goalIntent';
+import { parseGoalIntent, parseCompletionIntent, buildGoalDraft, GoalMatch } from './goalIntent';
 
 /**
  * Local stand-in for the real Claude tool-use flow (see ARCHITECTURE.md §4).
@@ -135,6 +135,25 @@ export function simulateAiReply(input: string, ctx: AiContext): AiReply {
 
   const rule = rules.find((r) => r.test.test(input));
   if (rule) return rule.reply(ctx);
+
+  // Nothing matched a specific topic — most short, non-question statements
+  // typed here are meant as a goal, so offer that instead of a dead end.
+  const trimmed = input.trim();
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  const looksLikeGoal = wordCount >= 2 && wordCount <= 14 && !trimmed.endsWith('?');
+  if (looksLikeGoal) {
+    const draft = buildGoalDraft(trimmed);
+    return {
+      content: `Soll ich „${draft.title}" als Ziel für dich anlegen?`,
+      actions: [
+        {
+          kind: 'create_goal',
+          label: `„${draft.title}" anlegen`,
+          payload: { title: draft.title, areaKey: draft.areaKey, deadline: draft.deadline },
+        },
+      ],
+    };
+  }
 
   return {
     content: `Dein Life Score liegt aktuell bei ${ctx.overallScore}%. Frag mich z. B. nach einem Plan, deiner Stimmung oder deinen Finanzen — oder sag mir direkt ein Ziel, das ich anlegen soll.`,

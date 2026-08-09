@@ -19,12 +19,14 @@ const MONTHS: Record<string, number> = {
 const AREA_KEYWORDS: Record<AreaKey, RegExp> = {
   fuehrerschein: /führerschein|fahrschule|theorieprüfung|fahrstunde/i,
   ausbildung: /ausbildung|bewerbung|job|arbeit|beruflich|studium|karriere/i,
-  psyche: /schlaf|stress|stimmung|motivation|energie|psyche/i,
+  psyche: /schlaf|stress|stimmung|motivation|energie|psyche|sport|fitness|abnehmen|zunehmen|joggen|laufen|trainieren|gesund/i,
   geld: /geld|sparen|budget|finanz|konto|ausgaben/i,
 };
 
-const LEAD_IN = /^(ich\s+möchte|ich\s+will|ich\s+würde\s+gerne|mein\s+ziel\s+ist(\s+es)?,?)\s*/i;
-const GOAL_VERB = /schaffen|erreichen|bestehen|verbessern|sparen|anlegen|verändern|starten|beginnen|lernen/i;
+// "ich" is very often dropped in casual German ("will mehr Sport machen"),
+// so it's optional here — the verb/phrase after it is signal enough on its own.
+const LEAD_IN = /^(ich\s+)?(möchte|will|würde\s+gerne|habe\s+vor|plane|nehme\s+mir\s+vor|wünsche\s+mir)\s+/i;
+const LABEL_PREFIX = /^(mein\s+ziel(\s+ist(\s+es)?)?|ziel|vorhaben)\s*:?\s*/i;
 
 export type ParsedGoalIntent = {
   title: string;
@@ -32,36 +34,45 @@ export type ParsedGoalIntent = {
   deadline?: string;
 };
 
-/** Detects "Ich möchte …" style free text and turns it into a goal draft. */
+function guessArea(text: string): AreaKey {
+  for (const [key, pattern] of Object.entries(AREA_KEYWORDS) as [AreaKey, RegExp][]) {
+    if (pattern.test(text)) return key;
+  }
+  return 'ausbildung';
+}
+
+function guessDeadline(text: string): string | undefined {
+  const monthMatch = text.match(/bis\s+(?:ende\s+)?([a-zäöü]+)/i);
+  if (!monthMatch) return undefined;
+  const monthIndex = MONTHS[monthMatch[1].toLowerCase()];
+  if (monthIndex === undefined) return undefined;
+  const now = new Date();
+  let year = now.getFullYear();
+  if (monthIndex < now.getMonth()) year += 1;
+  return new Date(year, monthIndex + 1, 0).toISOString(); // last day of that month
+}
+
+/** Turns raw free text (already stripped of any lead-in phrase) into a goal draft. */
+export function buildGoalDraft(rawTitle: string): ParsedGoalIntent {
+  const cleaned = rawTitle.replace(/\.$/, '').trim();
+  const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return {
+    title: capitalized,
+    areaKey: guessArea(rawTitle),
+    deadline: guessDeadline(rawTitle),
+  };
+}
+
+/** Detects "(ich) möchte/will …" or "Ziel: …" style free text and turns it into a goal draft. */
 export function parseGoalIntent(input: string): ParsedGoalIntent | undefined {
   const trimmed = input.trim();
-  if (!LEAD_IN.test(trimmed) || !GOAL_VERB.test(trimmed)) return undefined;
+  const leadIn = LEAD_IN.test(trimmed) ? LEAD_IN : LABEL_PREFIX.test(trimmed) ? LABEL_PREFIX : undefined;
+  if (!leadIn) return undefined;
 
-  const title = trimmed.replace(LEAD_IN, '').replace(/\.$/, '').trim();
+  const title = trimmed.replace(leadIn, '').trim();
   if (title.length < 3) return undefined;
-  const capitalized = title.charAt(0).toUpperCase() + title.slice(1);
 
-  let areaKey: AreaKey = 'ausbildung';
-  for (const [key, pattern] of Object.entries(AREA_KEYWORDS) as [AreaKey, RegExp][]) {
-    if (pattern.test(trimmed)) {
-      areaKey = key;
-      break;
-    }
-  }
-
-  const monthMatch = trimmed.match(/bis\s+(?:ende\s+)?([a-zäöü]+)/i);
-  let deadline: string | undefined;
-  if (monthMatch) {
-    const monthIndex = MONTHS[monthMatch[1].toLowerCase()];
-    if (monthIndex !== undefined) {
-      const now = new Date();
-      let year = now.getFullYear();
-      if (monthIndex < now.getMonth()) year += 1;
-      deadline = new Date(year, monthIndex + 1, 0).toISOString(); // last day of that month
-    }
-  }
-
-  return { title: capitalized, areaKey, deadline };
+  return buildGoalDraft(title);
 }
 
 const COMPLETION_PATTERNS = [
